@@ -59,8 +59,8 @@ describe("runSync", () => {
     const content = await readFile(join(tempDir, "AGENTS.md"), "utf-8");
     expect(content).toContain("<!-- agsync:begin -->");
     expect(content).toContain("<!-- agsync:end -->");
-    expect(content).toContain("### helper");
-    expect(content).toContain("Help the user with coding tasks");
+    expect(content).toContain("**helper**");
+    expect(content).toContain(".agents/skills/");
   });
 
   it("preserves existing content outside agsync markers", async () => {
@@ -88,7 +88,7 @@ describe("runSync", () => {
     expect(content).toContain("# Project");
     expect(content).toContain("## Notes");
     expect(content).not.toContain("old\n<!-- agsync:end -->");
-    expect(content).toContain("### helper");
+    expect(content).toContain("**helper**");
   });
 
   it("injects agsync section into CLAUDE.md when claude-code is target", async () => {
@@ -98,7 +98,8 @@ describe("runSync", () => {
     const content = await readFile(join(tempDir, "CLAUDE.md"), "utf-8");
     expect(content).toContain("<!-- agsync:begin -->");
     expect(content).toContain("<!-- agsync:end -->");
-    expect(content).toContain("### helper");
+    expect(content).toContain("**helper**");
+    expect(content).toContain(".claude/skills/");
   });
 
   it("does not create CLAUDE.md when claude-code is not a target", async () => {

@@ -157,12 +157,17 @@ export async function buildSyncPlan(
     }
   }
 
-  const section = converters[0].generateAgsyncSection(config);
-  const instructionPaths = [resolve(targetDir, "AGENTS.md")];
+  const instructionFiles: { path: string; skillsPath: string }[] = [
+    { path: resolve(targetDir, "AGENTS.md"), skillsPath: ".agents/skills/" },
+  ];
   if (config.targets.includes("claude-code")) {
-    instructionPaths.push(resolve(targetDir, "CLAUDE.md"));
+    instructionFiles.push({
+      path: resolve(targetDir, "CLAUDE.md"),
+      skillsPath: ".claude/skills/",
+    });
   }
-  for (const filePath of instructionPaths) {
+  for (const { path: filePath, skillsPath } of instructionFiles) {
+    const section = converters[0].generateAgsyncSection(config, skillsPath);
     const existing = await readFileOrEmpty(filePath);
     const updated = injectAgsyncSection(existing, section);
     if (updated !== existing) {

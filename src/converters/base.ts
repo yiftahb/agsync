@@ -9,7 +9,7 @@ export abstract class BaseAgentConverter {
 
   abstract getOutputPaths(outputDir: string): string[];
 
-  generateAgsyncSection(config: ResolvedConfig): string {
+  generateAgsyncSection(config: ResolvedConfig, skillsPath: string): string {
     const lines: string[] = [];
 
     lines.push("<!-- agsync:begin -->");
@@ -17,28 +17,11 @@ export abstract class BaseAgentConverter {
     lines.push("");
 
     for (const skill of config.skills) {
-      lines.push(`### ${skill.name}`);
-      lines.push("");
-      lines.push(skill.description);
-      lines.push("");
-      lines.push(skill.instructions.trim());
-      lines.push("");
-
-      if (skill.tools.length > 0) {
-        lines.push("#### Tools");
-        lines.push("");
-        for (const toolName of skill.tools) {
-          const tool = config.tools.find((t) => t.name === toolName);
-          if (tool) {
-            lines.push(`- **${tool.name}**: ${tool.description}`);
-          } else {
-            lines.push(`- ${toolName}`);
-          }
-        }
-        lines.push("");
-      }
+      lines.push(`- **${skill.name}**: ${skill.description}`);
     }
 
+    lines.push("");
+    lines.push(`Skills are managed by agsync. Full definitions are in \`${skillsPath}\`.`);
     lines.push("<!-- agsync:end -->");
 
     return lines.join("\n");
