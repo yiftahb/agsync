@@ -37,15 +37,23 @@ program
   .option("-d, --dir <path>", "Target directory", process.cwd())
   .action(async (opts) => {
     try {
-      const errors = await runValidate(opts.dir);
-      if (errors.length === 0) {
-        console.log("Validation passed");
-      } else {
+      const results = await runValidate(opts.dir);
+      const warnings = results.filter((e) => e.severity === "warn");
+      const hard = results.filter((e) => e.severity !== "warn");
+      if (warnings.length > 0) {
+        console.warn("Warnings:");
+        for (const w of warnings) {
+          console.warn(`  ${w.file}: ${w.message}`);
+        }
+      }
+      if (hard.length > 0) {
         console.error("Validation errors:");
-        for (const err of errors) {
+        for (const err of hard) {
           console.error(`  ${err.file}: ${err.message}`);
         }
         process.exit(1);
+      } else if (warnings.length === 0) {
+        console.log("Validation passed");
       }
     } catch (err: unknown) {
       console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);

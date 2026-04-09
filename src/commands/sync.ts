@@ -4,6 +4,7 @@ import { loadHierarchicalConfig } from "@/loader/hierarchy";
 import { resolveAllSkills } from "@/resolver/skills";
 import { getAllConverters, BaseAgentConverter } from "@/converters";
 import { runValidate } from "@/commands/validate";
+import { expandToolEnv } from "@/utils/env";
 import type { ResolvedConfig, LoadedConfig } from "@/types";
 
 const AGSYNC_BEGIN = "<!-- agsync:begin -->";
@@ -16,7 +17,7 @@ function buildResolvedConfig(
   return {
     targets: loaded.config.targets,
     skills: resolvedSkills,
-    tools: loaded.tools,
+    tools: expandToolEnv(loaded.tools),
   };
 }
 
@@ -133,9 +134,10 @@ async function writeAgentsMd(
 }
 
 export async function runSync(targetDir: string): Promise<string[]> {
-  const errors = await runValidate(targetDir);
-  if (errors.length > 0) {
-    const messages = errors.map((e) => `  ${e.file}: ${e.message}`).join("\n");
+  const allErrors = await runValidate(targetDir);
+  const hardErrors = allErrors.filter((e) => e.severity !== "warn");
+  if (hardErrors.length > 0) {
+    const messages = hardErrors.map((e) => `  ${e.file}: ${e.message}`).join("\n");
     throw new Error(`Validation failed:\n${messages}`);
   }
 

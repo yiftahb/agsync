@@ -1,4 +1,5 @@
 import { loadHierarchicalConfig } from "@/loader/hierarchy";
+import { findEnvReferences } from "@/utils/env";
 import type { ValidationError, LoadedConfig } from "@/types";
 
 function validateCrossReferences(loaded: LoadedConfig): ValidationError[] {
@@ -38,6 +39,23 @@ function validateUniqueNames(loaded: LoadedConfig): ValidationError[] {
   return errors;
 }
 
+function validateEnvReferences(loaded: LoadedConfig): ValidationError[] {
+  const refs = findEnvReferences(loaded.tools);
+  const warnings: ValidationError[] = [];
+
+  for (const ref of refs) {
+    if (process.env[ref.varName] === undefined) {
+      warnings.push({
+        file: `tool: ${ref.tool}`,
+        message: `Env var "${ref.varName}" is not set (key "${ref.key}")`,
+        severity: "warn",
+      });
+    }
+  }
+
+  return warnings;
+}
+
 export async function runValidate(targetDir: string): Promise<ValidationError[]> {
   const loaded = await loadHierarchicalConfig(targetDir);
 
@@ -48,6 +66,7 @@ export async function runValidate(targetDir: string): Promise<ValidationError[]>
   const errors: ValidationError[] = [];
   errors.push(...validateUniqueNames(loaded));
   errors.push(...validateCrossReferences(loaded));
+  errors.push(...validateEnvReferences(loaded));
 
   return errors;
 }

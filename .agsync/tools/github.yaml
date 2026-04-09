@@ -1,0 +1,7 @@
+name: github
+description: GitHub MCP server for interacting with GitHub APIs — repos, issues, PRs, files, and more
+type: mcp
+command: npx
+args: ["-y", "@modelcontextprotocol/server-github"]
+env:
+  GITHUB_PERSONAL_ACCESS_TOKEN: $GITHUB_PERSONAL_ACCESS_TOKEN

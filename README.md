@@ -1,8 +1,25 @@
-# agsync
+<p align="center">
+  <img src="assets/logo.png" alt="agsync" width="400">
+</p>
 
-Git-native CLI to sync skills and MCP tools across Claude Code, Codex, and Cursor.
+<p align="center">
+  Git-native CLI to sync skills and MCP tools across Claude Code, Codex, and Cursor.
+</p>
 
 Define your AI agent skills and tool configurations once in `.agsync/`, then generate client-specific output for every coding agent your team uses.
+
+## Supported Agents
+
+| Agent | Status |
+|-------|--------|
+| Claude Code | Supported |
+| Cursor | Supported |
+| Codex | Supported |
+| OpenCode | Coming Soon |
+| Windsurf | Coming Soon |
+| Cline | Coming Soon |
+| Aider | Coming Soon |
+| GitHub Copilot | Coming Soon |
 
 ## Install
 
@@ -87,11 +104,18 @@ agsync skill remove code-reviewer
 
 ### `agsync validate`
 
-Validates all config and definitions: schema checks, duplicate names, cross-references between skills and tools.
+Validates all config and definitions: schema checks, duplicate names, cross-references between skills and tools. Warns when tool env values reference environment variables that are not currently set.
+
+```
+Warnings:
+  tool: github: Env var "GITHUB_PERSONAL_ACCESS_TOKEN" is not set (key "GITHUB_PERSONAL_ACCESS_TOKEN")
+```
+
+Warnings do not cause a non-zero exit code. Only hard errors do.
 
 ### `agsync sync`
 
-The core command. Resolves skill extends chains, cleans output directories, then generates all client configs.
+The core command. Resolves skill extends chains, expands environment variable references in tool definitions, cleans output directories, then generates all client configs.
 
 ### `agsync doctor`
 
@@ -164,10 +188,23 @@ type: mcp
 command: node
 args: ["server.js"]
 env:
-  API_KEY: "value"
+  API_KEY: $API_KEY
 ```
 
 `agsync sync` generates `.claude/settings.json` and `.cursor/mcp.json` from these definitions. Existing entries in those files are preserved (merge, not overwrite).
+
+### Environment Variable Expansion
+
+Env values support `$VAR` and `${VAR}` syntax. During `agsync sync`, these are expanded from the current shell environment. This keeps secrets out of version control — define the reference in your tool YAML and set the actual value in your shell:
+
+```bash
+export API_KEY=sk-xxx
+agsync sync
+```
+
+If a referenced variable is not set, sync will fail with a clear error. `agsync validate` will warn about unset variables without failing.
+
+Add generated config files (`.claude/settings.json`, `.cursor/mcp.json`) to `.gitignore` when using env expansion to avoid committing resolved secrets.
 
 ## Monorepo Support
 

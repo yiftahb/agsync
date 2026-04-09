@@ -49,9 +49,32 @@ SKILL FORMAT
     references/    Documentation loaded on demand
     assets/        Templates, images, data files
 
+TOOL FORMAT
+  Define MCP servers in .agsync/tools/*.yaml:
+
+    name: my-server
+    description: What this tool does
+    type: mcp
+    command: node
+    args: ["server.js"]
+    env:
+      API_KEY: $API_KEY
+
+  Env values support $VAR and \${VAR} syntax. During sync, these are expanded
+  from the current shell environment. If a referenced variable is not set,
+  sync fails with an error. validate warns about unset variables without failing.
+
 PROJECT STRUCTURE
   agsync.yaml                       Main configuration (repo root)
   .agsync/skills/*/                 Skill definitions
   .agsync/tools/*.yaml              MCP tool and CLI definitions
+
+GENERATED OUTPUT
+  AGENTS.md                         agsync section injected between markers
+  CLAUDE.md                         Symlink to AGENTS.md
+  .agents/skills/*/SKILL.md         Codex + Cursor (Agent Skills standard)
+  .claude/skills/*/SKILL.md         Claude Code
+  .claude/settings.json             MCP config for Claude Code
+  .cursor/mcp.json                  MCP config for Cursor
 `.trim();
 }

@@ -69,6 +69,72 @@ describe("runValidate", () => {
     expect(errors.some((e) => e.message.includes("nonexistent"))).toBe(true);
   });
 
+  it("warns when env var references are not set", async () => {
+    delete process.env.AGSYNC_MISSING_TOKEN;
+    await mkdir(join(tempDir, ".agsync", "tools"), { recursive: true });
+
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        targets: ["codex"],
+        skills: [],
+        tools: [{ path: ".agsync/tools/*.yaml" }],
+      })
+    );
+
+    await writeFile(
+      join(tempDir, ".agsync", "tools", "api.yaml"),
+      toYaml({
+        name: "api",
+        description: "API server",
+        type: "mcp",
+        command: "node",
+        env: { TOKEN: "$AGSYNC_MISSING_TOKEN" },
+      })
+    );
+
+    const errors = await runValidate(tempDir);
+    const warnings = errors.filter((e) => e.severity === "warn");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].message).toContain("AGSYNC_MISSING_TOKEN");
+  });
+
+  it("does not warn when env var is set", async () => {
+    const saved = process.env.AGSYNC_SET_TOKEN;
+    process.env.AGSYNC_SET_TOKEN = "value";
+    try {
+      await mkdir(join(tempDir, ".agsync", "tools"), { recursive: true });
+
+      await writeFile(
+        join(tempDir, "agsync.yaml"),
+        toYaml({
+          version: "1",
+          targets: ["codex"],
+          skills: [],
+          tools: [{ path: ".agsync/tools/*.yaml" }],
+        })
+      );
+
+      await writeFile(
+        join(tempDir, ".agsync", "tools", "api.yaml"),
+        toYaml({
+          name: "api",
+          description: "API server",
+          type: "mcp",
+          command: "node",
+          env: { TOKEN: "$AGSYNC_SET_TOKEN" },
+        })
+      );
+
+      const errors = await runValidate(tempDir);
+      expect(errors.filter((e) => e.severity === "warn")).toHaveLength(0);
+    } finally {
+      if (saved === undefined) delete process.env.AGSYNC_SET_TOKEN;
+      else process.env.AGSYNC_SET_TOKEN = saved;
+    }
+  });
+
   it("detects duplicate skill names", async () => {
     const skillDirA = join(tempDir, ".agsync", "skills", "a");
     const skillDirB = join(tempDir, ".agsync", "skills", "b");

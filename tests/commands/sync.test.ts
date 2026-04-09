@@ -142,6 +142,56 @@ describe("runSync", () => {
     expect(parsed.mcpServers["my-mcp"]).toBeDefined();
   });
 
+  it("expands env variables in tool definitions", async () => {
+    const saved = process.env.TEST_SYNC_SECRET;
+    process.env.TEST_SYNC_SECRET = "expanded-value";
+    try {
+      await setupProject(tempDir);
+      await writeFile(
+        join(tempDir, ".agsync", "tools", "env-tool.yaml"),
+        toYaml({
+          name: "env-tool",
+          description: "Tool with env var",
+          type: "mcp",
+          command: "node",
+          args: ["server.js"],
+          env: { TOKEN: "$TEST_SYNC_SECRET" },
+        })
+      );
+      await runSync(tempDir);
+
+      const claude = JSON.parse(
+        await readFile(join(tempDir, ".claude", "settings.json"), "utf-8")
+      );
+      expect(claude.mcpServers["env-tool"].env.TOKEN).toBe("expanded-value");
+
+      const cursor = JSON.parse(
+        await readFile(join(tempDir, ".cursor", "mcp.json"), "utf-8")
+      );
+      expect(cursor.mcpServers["env-tool"].env.TOKEN).toBe("expanded-value");
+    } finally {
+      if (saved === undefined) delete process.env.TEST_SYNC_SECRET;
+      else process.env.TEST_SYNC_SECRET = saved;
+    }
+  });
+
+  it("throws when env variable is not set during sync", async () => {
+    delete process.env.AGSYNC_UNSET_VAR;
+    await setupProject(tempDir);
+    await writeFile(
+      join(tempDir, ".agsync", "tools", "bad-env.yaml"),
+      toYaml({
+        name: "bad-env",
+        description: "Missing env",
+        type: "mcp",
+        command: "node",
+        env: { KEY: "$AGSYNC_UNSET_VAR" },
+      })
+    );
+
+    await expect(runSync(tempDir)).rejects.toThrow("AGSYNC_UNSET_VAR");
+  });
+
   it("throws on validation errors", async () => {
     const skillDir = join(tempDir, ".agsync", "skills", "bad");
     await mkdir(skillDir, { recursive: true });

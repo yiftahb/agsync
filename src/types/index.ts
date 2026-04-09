@@ -74,4 +74,5 @@ export interface DoctorCheck {
 export interface ValidationError {
   file: string;
   message: string;
+  severity?: "error" | "warn";
 }
