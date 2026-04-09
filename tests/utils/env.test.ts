@@ -21,30 +21,39 @@ describe("expandEnvValue", () => {
   });
 
   it("returns value unchanged when no $ present", () => {
-    expect(expandEnvValue("hello")).toBe("hello");
+    expect(expandEnvValue("hello").result).toBe("hello");
+    expect(expandEnvValue("hello").missing).toEqual([]);
   });
 
   it("expands $VAR syntax", () => {
-    expect(expandEnvValue("$TEST_VAR")).toBe("resolved");
+    expect(expandEnvValue("$TEST_VAR").result).toBe("resolved");
   });
 
   it("expands ${VAR} syntax", () => {
-    expect(expandEnvValue("${TEST_VAR}")).toBe("resolved");
+    expect(expandEnvValue("${TEST_VAR}").result).toBe("resolved");
   });
 
   it("expands variable embedded in string", () => {
-    expect(expandEnvValue("prefix-$TEST_VAR-suffix")).toBe("prefix-resolved-suffix");
+    expect(expandEnvValue("prefix-$TEST_VAR-suffix").result).toBe("prefix-resolved-suffix");
   });
 
   it("expands multiple variables", () => {
-    expect(expandEnvValue("${HOST}:${PORT}")).toBe("localhost:3000");
+    expect(expandEnvValue("${HOST}:${PORT}").result).toBe("localhost:3000");
   });
 
-  it("throws when env var is not set", () => {
+  it("returns empty string and reports missing vars", () => {
     delete process.env.MISSING_VAR;
-    expect(() => expandEnvValue("$MISSING_VAR")).toThrow(
-      'Environment variable "MISSING_VAR" is not set'
-    );
+    const { result, missing } = expandEnvValue("$MISSING_VAR");
+    expect(result).toBe("");
+    expect(missing).toEqual(["MISSING_VAR"]);
+  });
+
+  it("reports multiple missing vars", () => {
+    delete process.env.A_VAR;
+    delete process.env.B_VAR;
+    const { result, missing } = expandEnvValue("${A_VAR}:${B_VAR}");
+    expect(result).toBe(":");
+    expect(missing).toEqual(["A_VAR", "B_VAR"]);
   });
 });
 
@@ -65,24 +74,27 @@ describe("expandToolEnv", () => {
     const tools: ToolDefinition[] = [
       { name: "t", description: "d", type: "cli", command: "echo" },
     ];
-    const result = expandToolEnv(tools);
+    const { tools: result, warnings } = expandToolEnv(tools);
     expect(result).toEqual(tools);
+    expect(warnings).toEqual([]);
   });
 
   it("expands env values in tools", () => {
     const tools: ToolDefinition[] = [
       { name: "t", description: "d", type: "mcp", command: "node", env: { KEY: "$SECRET" } },
     ];
-    const result = expandToolEnv(tools);
+    const { tools: result } = expandToolEnv(tools);
     expect(result[0].env).toEqual({ KEY: "s3cret" });
   });
 
-  it("includes tool name and key in error message", () => {
+  it("returns warnings for missing env vars", () => {
     delete process.env.NOPE;
     const tools: ToolDefinition[] = [
       { name: "my-tool", description: "d", type: "mcp", env: { API_KEY: "$NOPE" } },
     ];
-    expect(() => expandToolEnv(tools)).toThrow('tool "my-tool", key "API_KEY"');
+    const { tools: result, warnings } = expandToolEnv(tools);
+    expect(result[0].env).toEqual({ API_KEY: "" });
+    expect(warnings).toEqual([{ tool: "my-tool", key: "API_KEY", varName: "NOPE" }]);
   });
 
   it("does not mutate original tools", () => {

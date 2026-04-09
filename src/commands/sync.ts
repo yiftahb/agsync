@@ -1,23 +1,33 @@
-import { mkdir, writeFile, readFile, symlink, lstat, unlink, rm } from "node:fs/promises";
-import { resolve, dirname } from "node:path";
+import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { resolve, dirname, relative } from "node:path";
 import { loadHierarchicalConfig } from "@/loader/hierarchy";
 import { resolveAllSkills } from "@/resolver/skills";
 import { getAllConverters, BaseAgentConverter } from "@/converters";
 import { runValidate } from "@/commands/validate";
 import { expandToolEnv } from "@/utils/env";
-import type { ResolvedConfig, LoadedConfig } from "@/types";
+import type { ResolvedConfig, LoadedConfig, SyncPlan, PlannedFile, PlannedSkill } from "@/types";
 
 const AGSYNC_BEGIN = "<!-- agsync:begin -->";
 const AGSYNC_END = "<!-- agsync:end -->";
 
 function buildResolvedConfig(
   loaded: LoadedConfig,
-  resolvedSkills: ResolvedConfig["skills"]
-): ResolvedConfig {
+  resolvedSkills: ResolvedConfig["skills"],
+  options?: { expandEnv?: boolean }
+): { config: ResolvedConfig; warnings: string[] } {
+  if (options?.expandEnv === false) {
+    return {
+      config: { targets: loaded.config.targets, skills: resolvedSkills, tools: loaded.tools },
+      warnings: [],
+    };
+  }
+
+  const { tools, warnings } = expandToolEnv(loaded.tools);
   return {
-    targets: loaded.config.targets,
-    skills: resolvedSkills,
-    tools: expandToolEnv(loaded.tools),
+    config: { targets: loaded.config.targets, skills: resolvedSkills, tools },
+    warnings: warnings.map(
+      (w) => `Environment variable "${w.varName}" is not set (tool "${w.tool}", key "${w.key}")`
+    ),
   };
 }
 
@@ -45,35 +55,6 @@ function mergeJsonContent(existing: string, incoming: string): string {
     void _;
     return incoming;
   }
-}
-
-async function writeConvertedFiles(
-  converter: BaseAgentConverter,
-  config: ResolvedConfig,
-  outputDir: string
-): Promise<string[]> {
-  const output = converter.convert(config, outputDir);
-  const written: string[] = [];
-
-  for (const file of output.files) {
-    await mkdir(dirname(file.path), { recursive: true });
-
-    if (file.path.endsWith(".json")) {
-      const existing = await readFileOrEmpty(file.path);
-      if (existing) {
-        const merged = mergeJsonContent(existing, file.content);
-        await writeFile(file.path, merged, "utf-8");
-      } else {
-        await writeFile(file.path, file.content, "utf-8");
-      }
-    } else {
-      await writeFile(file.path, file.content, "utf-8");
-    }
-
-    written.push(file.path);
-  }
-
-  return written;
 }
 
 function injectAgsyncSection(existingContent: string, section: string): string {
@@ -106,34 +87,26 @@ async function readFileOrEmpty(filePath: string): Promise<string> {
   }
 }
 
-async function writeAgentsMd(
-  converter: BaseAgentConverter,
-  config: ResolvedConfig,
-  outputDir: string
-): Promise<string[]> {
-  const agentsMdPath = resolve(outputDir, "AGENTS.md");
-  const claudeMdPath = resolve(outputDir, "CLAUDE.md");
-
-  const section = converter.generateAgsyncSection(config);
-  const existing = await readFileOrEmpty(agentsMdPath);
-  const updated = injectAgsyncSection(existing, section);
-  await writeFile(agentsMdPath, updated, "utf-8");
-
+async function listSubdirectories(dir: string): Promise<string[]> {
+  const { readdir, stat } = await import("node:fs/promises");
   try {
-    const stat = await lstat(claudeMdPath);
-    if (stat.isSymbolicLink() || stat.isFile()) {
-      await unlink(claudeMdPath);
+    const entries = await readdir(dir);
+    const dirs: string[] = [];
+    for (const entry of entries) {
+      const s = await stat(resolve(dir, entry));
+      if (s.isDirectory()) dirs.push(entry);
     }
+    return dirs;
   } catch (_) {
     void _;
+    return [];
   }
-
-  await symlink("AGENTS.md", claudeMdPath);
-
-  return [agentsMdPath, claudeMdPath];
 }
 
-export async function runSync(targetDir: string): Promise<string[]> {
+export async function buildSyncPlan(
+  targetDir: string,
+  options?: { expandEnv?: boolean }
+): Promise<SyncPlan> {
   const allErrors = await runValidate(targetDir);
   const hardErrors = allErrors.filter((e) => e.severity !== "warn");
   if (hardErrors.length > 0) {
@@ -149,26 +122,102 @@ export async function runSync(targetDir: string): Promise<string[]> {
   const skillsDir = resolve(dirname(loaded.configPath), ".agsync", "skills");
   const cacheDir = resolve(dirname(loaded.configPath), ".agsync", "cache");
   const resolvedSkills = await resolveAllSkills(loaded.skills, skillsDir, cacheDir);
-  const config = buildResolvedConfig(loaded, resolvedSkills);
+  const { config, warnings } = buildResolvedConfig(loaded, resolvedSkills, {
+    expandEnv: options?.expandEnv,
+  });
 
   const converters = getAllConverters(config.targets);
-  const allWritten: string[] = [];
+  const plannedFiles: PlannedFile[] = [];
 
-  const skillOutputDirs = [
-    resolve(targetDir, ".agents", "skills"),
-    resolve(targetDir, ".claude", "skills"),
-  ];
+  const definedSkillNames = new Set(config.skills.map((s) => s.name));
+
+  const skillOutputDirs: string[] = [];
+  for (const converter of converters) {
+    for (const p of converter.getOutputPaths(targetDir)) {
+      if (p.endsWith("skills")) skillOutputDirs.push(p);
+    }
+  }
+  const existingSkillNames = new Set<string>();
   for (const dir of skillOutputDirs) {
-    await rm(dir, { recursive: true, force: true });
+    for (const name of await listSubdirectories(dir)) {
+      existingSkillNames.add(name);
+    }
   }
 
-  const agentsMdFiles = await writeAgentsMd(converters[0], config, targetDir);
-  allWritten.push(...agentsMdFiles);
+  const plannedSkills: PlannedSkill[] = [];
+  for (const name of definedSkillNames) {
+    plannedSkills.push({
+      name,
+      operation: existingSkillNames.has(name) ? "update" : "create",
+    });
+  }
+  for (const name of existingSkillNames) {
+    if (!definedSkillNames.has(name)) {
+      plannedSkills.push({ name, operation: "delete" });
+    }
+  }
+
+  const section = converters[0].generateAgsyncSection(config);
+  const instructionPaths = [resolve(targetDir, "AGENTS.md")];
+  if (config.targets.includes("claude-code")) {
+    instructionPaths.push(resolve(targetDir, "CLAUDE.md"));
+  }
+  for (const filePath of instructionPaths) {
+    const existing = await readFileOrEmpty(filePath);
+    const updated = injectAgsyncSection(existing, section);
+    if (updated !== existing) {
+      plannedFiles.push({
+        path: filePath,
+        content: updated,
+        existing,
+        operation: existing ? "update" : "create",
+      });
+    }
+  }
 
   for (const converter of converters) {
-    const written = await writeConvertedFiles(converter, config, targetDir);
-    allWritten.push(...written);
+    const output = converter.convert(config, targetDir);
+    for (const file of output.files) {
+      const existing = await readFileOrEmpty(file.path);
+      let content = file.content;
+
+      if (file.path.endsWith(".json") && existing) {
+        content = mergeJsonContent(existing, file.content);
+      }
+
+      plannedFiles.push({
+        path: file.path,
+        content,
+        existing,
+        operation: !existing ? "create" : content !== existing ? "update" : "unchanged",
+      });
+    }
   }
 
-  return allWritten;
+  return { skills: plannedSkills, files: plannedFiles, skillOutputDirs, warnings };
+}
+
+async function applySyncPlan(plan: SyncPlan): Promise<string[]> {
+  const staleSkills = plan.skills.filter((s) => s.operation === "delete");
+  for (const skill of staleSkills) {
+    for (const dir of plan.skillOutputDirs) {
+      await rm(resolve(dir, skill.name), { recursive: true, force: true });
+    }
+  }
+
+  const written: string[] = [];
+  for (const file of plan.files) {
+    if (file.operation === "delete") continue;
+    await mkdir(dirname(file.path), { recursive: true });
+    await writeFile(file.path, file.content, "utf-8");
+    written.push(file.path);
+  }
+
+  return written;
+}
+
+export async function runSync(targetDir: string): Promise<{ written: string[]; warnings: string[] }> {
+  const plan = await buildSyncPlan(targetDir);
+  const written = await applySyncPlan(plan);
+  return { written, warnings: plan.warnings };
 }

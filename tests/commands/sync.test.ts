@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, mkdir, readFile, lstat, readlink, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { stringify as toYaml } from "yaml";
@@ -91,13 +91,30 @@ describe("runSync", () => {
     expect(content).toContain("### helper");
   });
 
-  it("creates CLAUDE.md as symlink to AGENTS.md", async () => {
+  it("injects agsync section into CLAUDE.md when claude-code is target", async () => {
     await setupProject(tempDir);
     await runSync(tempDir);
 
-    const stat = await lstat(join(tempDir, "CLAUDE.md"));
-    expect(stat.isSymbolicLink()).toBe(true);
-    expect(await readlink(join(tempDir, "CLAUDE.md"))).toBe("AGENTS.md");
+    const content = await readFile(join(tempDir, "CLAUDE.md"), "utf-8");
+    expect(content).toContain("<!-- agsync:begin -->");
+    expect(content).toContain("<!-- agsync:end -->");
+    expect(content).toContain("### helper");
+  });
+
+  it("does not create CLAUDE.md when claude-code is not a target", async () => {
+    await setupProject(tempDir);
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        targets: ["codex", "cursor"],
+        skills: [{ path: ".agsync/skills/*" }],
+        tools: [{ path: ".agsync/tools/*.yaml" }],
+      })
+    );
+    await runSync(tempDir);
+
+    await expect(stat(join(tempDir, "CLAUDE.md"))).rejects.toThrow();
   });
 
   it("generates .agents/skills/<name>/SKILL.md for codex", async () => {
@@ -158,7 +175,8 @@ describe("runSync", () => {
           env: { TOKEN: "$TEST_SYNC_SECRET" },
         })
       );
-      await runSync(tempDir);
+      const { warnings } = await runSync(tempDir);
+      expect(warnings).toHaveLength(0);
 
       const claude = JSON.parse(
         await readFile(join(tempDir, ".claude", "settings.json"), "utf-8")
@@ -175,7 +193,7 @@ describe("runSync", () => {
     }
   });
 
-  it("throws when env variable is not set during sync", async () => {
+  it("warns and writes empty string when env variable is not set", async () => {
     delete process.env.AGSYNC_UNSET_VAR;
     await setupProject(tempDir);
     await writeFile(
@@ -189,7 +207,14 @@ describe("runSync", () => {
       })
     );
 
-    await expect(runSync(tempDir)).rejects.toThrow("AGSYNC_UNSET_VAR");
+    const { written, warnings } = await runSync(tempDir);
+    expect(warnings.some((w) => w.includes("AGSYNC_UNSET_VAR"))).toBe(true);
+    expect(written.length).toBeGreaterThan(0);
+
+    const claude = JSON.parse(
+      await readFile(join(tempDir, ".claude", "settings.json"), "utf-8")
+    );
+    expect(claude.mcpServers["bad-env"].env.KEY).toBe("");
   });
 
   it("throws on validation errors", async () => {

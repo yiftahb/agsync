@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { runInit } from "@/commands/init";
 import { runValidate } from "@/commands/validate";
 import { runSync } from "@/commands/sync";
+import { runPlan, formatPlan } from "@/commands/plan";
 import { runDoctor } from "@/commands/doctor";
 import { getExtendedHelp } from "@/commands/help";
 import { runAdd } from "@/commands/add";
@@ -62,12 +63,32 @@ program
   });
 
 program
+  .command("plan")
+  .description("Preview changes without writing files")
+  .option("-d, --dir <path>", "Target directory", process.cwd())
+  .action(async (opts) => {
+    try {
+      const plan = await runPlan(opts.dir);
+      console.log(formatPlan(plan, opts.dir));
+    } catch (err: unknown) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
   .command("sync")
   .description("Compile and generate client configs")
   .option("-d, --dir <path>", "Target directory", process.cwd())
   .action(async (opts) => {
     try {
-      const written = await runSync(opts.dir);
+      const { written, warnings } = await runSync(opts.dir);
+      if (warnings.length > 0) {
+        console.warn("Warnings:");
+        for (const w of warnings) {
+          console.warn(`  ${w}`);
+        }
+      }
       console.log("Synced files:");
       for (const file of written) {
         console.log(`  + ${file}`);

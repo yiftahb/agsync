@@ -65,6 +65,27 @@ export interface ConvertedOutput {
   files: ConvertedFile[];
 }
 
+export type PlannedOperation = "create" | "update" | "delete" | "unchanged";
+
+export interface PlannedSkill {
+  name: string;
+  operation: PlannedOperation;
+}
+
+export interface PlannedFile {
+  path: string;
+  content: string;
+  operation: PlannedOperation;
+  existing: string;
+}
+
+export interface SyncPlan {
+  skills: PlannedSkill[];
+  files: PlannedFile[];
+  skillOutputDirs: string[];
+  warnings: string[];
+}
+
 export interface DoctorCheck {
   name: string;
   status: "pass" | "warn" | "fail";

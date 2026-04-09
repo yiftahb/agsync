@@ -58,7 +58,7 @@ project/
 ├── .agsync/tools/*.yaml                 # MCP tool definitions
 │
 ├── AGENTS.md                            # Generated (agsync section injected)
-├── CLAUDE.md -> AGENTS.md               # Symlink
+├── CLAUDE.md                            # Injected (claude-code target)
 ├── .agents/skills/*/SKILL.md            # Generated for Codex + Cursor
 ├── .claude/skills/*/SKILL.md            # Generated for Claude Code
 ├── .claude/settings.json                # Generated MCP config (Claude Code)
@@ -113,9 +113,25 @@ Warnings:
 
 Warnings do not cause a non-zero exit code. Only hard errors do.
 
+### `agsync plan`
+
+Preview what `sync` would do without writing any files. Shows files to create, update, and delete.
+
+```
+$ agsync plan
+Create:
+  + .agents/skills/helper/SKILL.md
+  + .claude/skills/helper/SKILL.md
+Update:
+  ~ AGENTS.md
+  ~ .claude/settings.json
+
+4 file(s): 2 create, 2 update, 0 delete
+```
+
 ### `agsync sync`
 
-The core command. Resolves skill extends chains, expands environment variable references in tool definitions, cleans output directories, then generates all client configs.
+The core command. Runs `plan` internally then applies all changes: resolves skill extends chains, expands environment variable references in tool definitions, cleans output directories, then generates all client configs.
 
 ### `agsync doctor`
 

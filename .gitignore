@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.tsbuildinfo
 coverage/
+.cursor/mcp.json
+.claude/settings.json

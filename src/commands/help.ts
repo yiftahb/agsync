@@ -10,6 +10,7 @@ COMMANDS
   skill add <org/repo> <skill-name>     Add a skill from a GitHub repository
   skill remove <skill-name>             Remove a skill
   validate                              Validate config and all definitions
+  plan                                  Preview changes without writing files
   sync                                  Compile and generate client configs
   doctor                                Check environment health
   help                                  Show this help message
@@ -20,6 +21,7 @@ EXAMPLES
   agsync skill add org/repo code-reviewer
   agsync skill remove code-reviewer
   agsync validate
+  agsync plan
   agsync sync
   agsync doctor
 
@@ -71,7 +73,7 @@ PROJECT STRUCTURE
 
 GENERATED OUTPUT
   AGENTS.md                         agsync section injected between markers
-  CLAUDE.md                         Symlink to AGENTS.md
+  CLAUDE.md                         Injected when claude-code is a target
   .agents/skills/*/SKILL.md         Codex + Cursor (Agent Skills standard)
   .claude/skills/*/SKILL.md         Claude Code
   .claude/settings.json             MCP config for Claude Code
