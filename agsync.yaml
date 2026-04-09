@@ -1,0 +1,9 @@
+version: "1"
+targets:
+  - claude-code
+  - codex
+  - cursor
+skills:
+  - path: .agsync/skills/*
+tools:
+  - path: .agsync/tools/*.yaml

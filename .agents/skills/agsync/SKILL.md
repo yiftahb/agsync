@@ -1,0 +1,160 @@
+---
+name: agsync
+description: Expert in agsync, the Git-native CLI that syncs skills and MCP tools across Claude Code, Codex, and Cursor. Use when working with agsync.yaml, adding or removing skills, syncing configs, or troubleshooting agsync workflows.
+
+---
+
+# agsync
+
+You are an expert in agsync, a Git-native CLI tool that compiles and syncs skill definitions and MCP tool bindings across multiple AI coding clients.
+
+## What agsync Does
+
+agsync is the single source of truth for AI agent configuration in a repository. It takes canonical definitions stored under `.agsync/` and generates client-specific output for Claude Code, Codex, and Cursor.
+
+## Project Structure
+
+```
+project/
+├── agsync.yaml                          # Root config (only file outside .agsync/)
+├── .agsync/
+│   ├── skills/                          # Skill definitions
+│   │   ├── my-skill/
+│   │   │   ├── my-skill.yaml            # Skill definition (name must match dir)
+│   │   │   ├── scripts/                 # Optional executable code
+│   │   │   ├── references/              # Optional documentation
+│   │   │   └── assets/                  # Optional templates, resources
+│   │   └── imported-skill/
+│   │       ├── imported-skill.yaml      # Converted from SKILL.md on import
+│   │       └── references/
+│   └── tools/*.yaml                     # MCP and CLI tool definitions
+├── AGENTS.md                            # Generated (agsync section injected)
+├── CLAUDE.md                            # Symlink to AGENTS.md
+├── .agents/skills/*/SKILL.md            # Generated for Codex + Cursor
+├── .claude/skills/*.md                  # Generated for Claude Code
+├── .claude/settings.json                # Generated MCP config for Claude Code
+└── .cursor/mcp.json                     # Generated MCP config for Cursor
+```
+
+## Skill Definition Format
+
+Every skill is a directory under `.agsync/skills/` containing a YAML file that matches the directory name:
+
+```
+.agsync/skills/code-reviewer/code-reviewer.yaml
+```
+
+The YAML file defines the skill:
+
+```yaml
+name: code-reviewer
+description: >
+  Reviews code for quality, security, and performance.
+extends:
+  - ./base-skill
+  - github:org/repo/path
+instructions: |
+  You are an expert code reviewer.
+  Focus on security vulnerabilities first.
+tools:
+  - grep-tool
+  - lint-tool
+source:
+  registry: github
+  org: Shubhamsaboo
+  repo: awesome-llm-apps
+  path: awesome_agent_skills/code-reviewer
+```
+
+### Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| name | Yes | Skill identifier, must match the directory name |
+| description | Yes | What the skill does and when to use it |
+| instructions | Yes | Detailed instructions for the agent (markdown) |
+| extends | No | List of skills to inherit from (local or GitHub) |
+| tools | No | List of tool names this skill can use |
+| source | No | Provenance tracking for imported skills |
+
+### Optional Directories (per Agent Skills standard)
+
+| Directory | Purpose |
+|-----------|---------|
+| scripts/ | Executable code agents can run |
+| references/ | Documentation loaded on demand |
+| assets/ | Templates, images, data files |
+
+## agsync.yaml Format
+
+```yaml
+version: "1"
+targets:
+  - claude-code
+  - codex
+  - cursor
+skills:
+  - path: .agsync/skills/*
+tools:
+  - path: .agsync/tools/*.yaml
+```
+
+## CLI Commands
+
+### agsync init
+Scaffolds a new project: creates `agsync.yaml` and `.agsync/` directory structure with a sample skill.
+
+### agsync skill add <org/repo> <skill-name>
+Imports a skill from a GitHub repository. Fetches the skill directory, converts any SKILL.md to the agsync YAML format, downloads supporting files (scripts, references, assets), and stores everything in `.agsync/skills/<name>/`. The `source` field in the YAML tracks where it came from.
+
+### agsync skill remove <skill-name>
+Removes a skill directory from `.agsync/skills/`.
+
+### agsync validate
+Validates all config and definitions: parses agsync.yaml via Zod schemas, loads all referenced files, checks for duplicate names, verifies cross-references between skills and tools.
+
+### agsync sync
+The core command. Loads config, resolves skill extends chains, builds a resolved manifest, then generates output for each target:
+- Cleans `.agents/skills/` and `.claude/skills/` before writing (ensures no stale output)
+- Injects an `<!-- agsync:begin -->` / `<!-- agsync:end -->` section into AGENTS.md
+- Creates CLAUDE.md as a symlink to AGENTS.md
+- Generates `.agents/skills/<name>/SKILL.md` for Codex and Cursor (open standard)
+- Generates `.claude/skills/<name>.md` for Claude Code
+- Merges MCP config into `.claude/settings.json` and `.cursor/mcp.json` (preserves existing entries)
+
+### agsync doctor
+Checks environment health: Node.js version, config presence, hierarchy chain, and whether target client CLIs are installed.
+
+## Skill Extends
+
+Skills can inherit from other skills using the `extends` field:
+- `./base-skill` resolves to a local skill in the skills directory
+- `github:org/repo/path` fetches from a GitHub repository and caches locally
+
+Merge strategy: base instructions are concatenated (base first), tools are union-merged, the extending skill's name and description take precedence.
+
+## Hierarchy Support
+
+In monorepos, place `agsync.yaml` at multiple levels. When sync runs, it walks up the directory tree to the git root, collecting all configs. Parent configs are merged first, then child configs override.
+
+## Tool Definitions (.agsync/tools/*.yaml)
+
+```yaml
+name: my-mcp-server
+description: What this tool does
+type: mcp
+command: node
+args: ["server.js"]
+env:
+  API_KEY: "value"
+```
+
+Types: `mcp`, `cli`, `builtin`.
+
+## Generated Output
+
+agsync does not own AGENTS.md or CLAUDE.md entirely. It injects its section between `<!-- agsync:begin -->` and `<!-- agsync:end -->` markers, preserving any manual content outside those markers.
+
+MCP config files (`.claude/settings.json`, `.cursor/mcp.json`) are merged, not overwritten, so manually added entries are preserved.
+
+The generated `.agents/skills/` directory uses the open Agent Skills standard (SKILL.md with frontmatter), which both Codex and Cursor read natively.

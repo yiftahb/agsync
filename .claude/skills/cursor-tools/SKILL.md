@@ -1,0 +1,123 @@
+---
+name: cursor-tools
+description: Expert in Cursor MCP tool configuration and .cursor/mcp.json. Use when setting up MCP servers, configuring tools, or troubleshooting Cursor tool integrations.
+
+---
+
+# Cursor Tool Configuration
+
+You are an expert in configuring MCP tools and integrations for Cursor.
+
+## MCP Server Configuration
+
+Cursor reads MCP server definitions from `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "node",
+      "args": ["path/to/server.js"],
+      "env": {
+        "API_KEY": "value"
+      }
+    }
+  }
+}
+```
+
+### Fields
+
+| Field | Description |
+|-------|-------------|
+| command | The executable to run (e.g., `node`, `python`, `npx`) |
+| args | Array of command-line arguments |
+| env | Environment variables passed to the server process |
+
+## How MCP Works with Cursor
+
+MCP (Model Context Protocol) connects Cursor's AI agent to external tools and data sources. Cursor acts as an MCP client, launching configured servers as subprocesses and communicating via the MCP protocol.
+
+MCP servers can expose:
+- **Tools**: Functions the agent can call (e.g., database queries, API calls)
+- **Resources**: Data the agent can read (e.g., file contents, documentation)
+- **Prompts**: Pre-defined prompt templates
+
+## MCP Configuration Locations
+
+| Location | Scope |
+|----------|-------|
+| `.cursor/mcp.json` | Project-level (checked into repo) |
+| `~/.cursor/mcp.json` | User-level (personal defaults) |
+
+Project-level configuration takes precedence.
+
+## Configuring via Cursor Settings
+
+You can also configure MCP servers through:
+1. Open Cursor Settings (Cmd+Shift+J on Mac, Ctrl+Shift+J on Windows/Linux)
+2. Navigate to the MCP section
+3. Add or edit server configurations
+
+## Common MCP Server Patterns
+
+### npx-based servers
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path"]
+    }
+  }
+}
+```
+
+### Streamable HTTP servers
+For remote MCP servers, Cursor supports HTTP transport:
+```json
+{
+  "mcpServers": {
+    "remote-server": {
+      "url": "https://api.example.com/mcp",
+      "transport": "streamable_http"
+    }
+  }
+}
+```
+
+### SSE-based servers
+```json
+{
+  "mcpServers": {
+    "sse-server": {
+      "url": "https://api.example.com/sse",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+## With agsync
+
+When using agsync, define tools in `.agsync/tools/*.yaml`:
+
+```yaml
+name: my-server
+description: My MCP server
+type: mcp
+command: node
+args: ["server.js"]
+env:
+  API_KEY: "value"
+```
+
+Running `agsync sync` generates `.cursor/mcp.json` from these definitions.
+
+## Troubleshooting
+
+- Verify the MCP server binary is installed and accessible
+- Check Cursor's Output panel (MCP section) for connection logs
+- Restart Cursor after changing mcp.json
+- Ensure environment variables are set correctly
+- Test the server standalone before configuring it in Cursor
