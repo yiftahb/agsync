@@ -124,6 +124,33 @@ describe("buildSyncPlan", () => {
     expect(agentsExists).toBe(false);
   });
 
+  it("plans .windsurf/skills symlink when windsurf is a target", async () => {
+    await setupProject(tempDir);
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        targets: ["codex", "windsurf"],
+        skills: [{ path: ".agsync/skills/*" }],
+        tools: [{ path: ".agsync/tools/*.yaml" }],
+      })
+    );
+
+    const plan = await buildSyncPlan(tempDir);
+
+    const symlinkEntry = plan.files.find((f) => f.path === join(tempDir, ".windsurf", "skills"));
+    expect(symlinkEntry).toBeDefined();
+    expect(symlinkEntry!.symlink).toBe(join("..", ".agents", "skills"));
+  });
+
+  it("does not plan .windsurf/skills symlink when windsurf is not a target", async () => {
+    await setupProject(tempDir);
+    const plan = await buildSyncPlan(tempDir);
+
+    const symlinkEntry = plan.files.find((f) => f.path === join(tempDir, ".windsurf", "skills"));
+    expect(symlinkEntry).toBeUndefined();
+  });
+
   it("does not plan CLAUDE.md when claude-code is not a target", async () => {
     await setupProject(tempDir);
     await writeFile(

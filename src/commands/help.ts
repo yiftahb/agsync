@@ -112,9 +112,11 @@ TOOL FORMAT
 GENERATED OUTPUT
   AGENTS.md                         Skill listing injected between agsync markers
   CLAUDE.md                         Skill listing injected (when claude-code is a target)
-  .agents/skills/*/SKILL.md         Codex + Cursor (Agent Skills standard)
-  .claude/skills/*/SKILL.md         Claude Code
+  .agents/skills/*/SKILL.md         Canonical skill output (Agent Skills standard)
+  .claude/skills/                   Symlink to .agents/skills/ (Claude Code)
   .claude/settings.json             MCP config for Claude Code
   .cursor/mcp.json                  MCP config for Cursor
+  .windsurf/skills/                 Symlink to .agents/skills/ (Windsurf)
+  .windsurf/mcp_config.json         MCP config for Windsurf
 `.trim();
 }

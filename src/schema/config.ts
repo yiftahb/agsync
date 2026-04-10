@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const targetClientSchema = z.enum(["claude-code", "codex", "cursor"]);
+export const targetClientSchema = z.enum(["claude-code", "codex", "cursor", "windsurf"]);
 
 export const toolDefinitionSchema = z.object({
   name: z.string().min(1),
