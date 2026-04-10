@@ -63,8 +63,8 @@ project/
 ├── .agsync/skills/*/                    # Source of truth
 ├── .agsync/tools/*.yaml                 # MCP tool definitions
 │
-├── AGENTS.md                            # Generated (agsync section injected)
-├── CLAUDE.md                            # Injected (claude-code target)
+├── AGENTS.md                            # Skill listing injected (agsync section)
+├── CLAUDE.md                            # Skill listing injected (agsync section)
 ├── .agents/skills/*/SKILL.md            # Generated for Codex + Cursor
 ├── .claude/skills/*/SKILL.md            # Generated for Claude Code
 ├── .claude/settings.json                # Generated MCP config (Claude Code)
@@ -75,10 +75,9 @@ project/
 
 agsync reads canonical skill and tool definitions from `.agsync/`, resolves inheritance chains, and generates the native format each client expects:
 
-- **Codex & Cursor** read from `.agents/skills/<name>/SKILL.md` (open [Agent Skills](https://agentskills.io) standard)
-- **Claude Code** reads from `.claude/skills/<name>/SKILL.md`
-- **MCP configs** are merged into `.claude/settings.json` and `.cursor/mcp.json` (existing entries preserved)
-- **AGENTS.md** gets an `<!-- agsync:begin -->` / `<!-- agsync:end -->` section injected (manual content outside markers is preserved)
+- **Skills** are generated as `SKILL.md` files in `.agents/skills/` (Codex + Cursor, open [Agent Skills](https://agentskills.io) standard) and `.claude/skills/` (Claude Code)
+- **AGENTS.md and CLAUDE.md** both receive the same `<!-- agsync:begin -->` / `<!-- agsync:end -->` section with a skill listing. Manual content outside the markers is preserved. CLAUDE.md is only generated when `claude-code` is a target
+- **MCP configs** are merged into `.claude/settings.json` and `.cursor/mcp.json` (existing entries preserved, not overwritten)
 
 ## Commands
 
@@ -152,37 +151,72 @@ Checks environment health: Node.js version, config presence, hierarchy chain, an
 [WARN] cursor CLI: Not found in PATH
 ```
 
-## Skill Format
+## Skill Examples
 
-Each skill is a directory under `.agsync/skills/` with a YAML file matching the directory name:
+Each skill is a directory under `.agsync/skills/` with a YAML file matching the directory name.
 
-```
-.agsync/skills/code-reviewer/
-├── code-reviewer.yaml     # Skill definition
-├── scripts/               # Optional: executable code
-├── references/            # Optional: documentation
-└── assets/                # Optional: templates, resources
-```
+### Simple skill
 
-The YAML defines the skill:
+A minimal skill with just name, description, and instructions:
 
 ```yaml
+# .agsync/skills/testing-standards/testing-standards.yaml
+name: testing-standards
+description: >
+  Enforces testing standards. Use when writing or reviewing tests.
+instructions: |
+  Always write tests using the project's test framework.
+  Ensure >80% coverage on new code.
+  Use descriptive test names that explain the expected behavior.
+```
+
+### Skill with scripts and references
+
+Skills can include executable scripts, reference documentation, and assets:
+
+```
+.agsync/skills/db-migrations/
+├── db-migrations.yaml
+├── scripts/
+│   └── check-migration.sh     # Agents can execute this
+├── references/
+│   └── schema-guide.md        # Loaded on demand for context
+└── assets/
+    └── migration-template.sql  # Templates and data files
+```
+
+```yaml
+# .agsync/skills/db-migrations/db-migrations.yaml
+name: db-migrations
+description: >
+  Database migration expert. Use when creating, reviewing, or
+  troubleshooting database migrations.
+instructions: |
+  You are an expert in database migrations.
+
+  Before creating a migration, run scripts/check-migration.sh to
+  validate the current schema state. Refer to references/schema-guide.md
+  for naming conventions and best practices.
+```
+
+### Importing a skill from open source
+
+Import skills from any GitHub repo that follows the [Agent Skills](https://agentskills.io) standard:
+
+```bash
+agsync skill add Shubhamsaboo/awesome-llm-apps code-reviewer
+```
+
+This fetches the skill, converts `SKILL.md` to agsync's YAML format, downloads supporting files, and tracks where it came from:
+
+```yaml
+# .agsync/skills/code-reviewer/code-reviewer.yaml (auto-generated)
 name: code-reviewer
 description: >
   Reviews code for quality, security, and performance.
-  Use when reviewing PRs or performing code audits.
-extends:
-  - ./base-reviewer
-  - github:org/repo/path
 instructions: |
   You are an expert code reviewer.
-
-  ## Review Process
-  1. Check for security vulnerabilities
-  2. Identify performance issues
-  3. Verify error handling
-tools:
-  - grep-tool
+  ...
 source:
   registry: github
   org: Shubhamsaboo
@@ -190,27 +224,39 @@ source:
   path: awesome_agent_skills/code-reviewer
 ```
 
-### Skill Extends
+### Skill extension
 
-Skills can inherit from other skills:
+Skills can inherit from other skills. Base instructions are concatenated, tools are union-merged, and the extending skill's name and description take precedence.
 
-- `./base-skill` - local skill in the same skills directory
-- `github:org/repo/path` - fetches from GitHub and caches locally
-
-Base instructions are concatenated, tools are union-merged, and the extending skill's name/description take precedence.
+```yaml
+# .agsync/skills/security-reviewer/security-reviewer.yaml
+name: security-reviewer
+description: >
+  Security-focused code reviewer. Use for security audits and
+  vulnerability assessments.
+extends:
+  - ./code-reviewer                        # Local skill in .agsync/skills/
+  - github:your-org/shared-skills/owasp    # Fetched from GitHub, cached locally
+instructions: |
+  Focus specifically on OWASP Top 10 vulnerabilities.
+  Flag any hardcoded secrets or credentials.
+tools:
+  - github
+```
 
 ## MCP Tool Definitions
 
-Define MCP servers in `.agsync/tools/*.yaml`:
+Define MCP servers in `.agsync/tools/*.yaml`. Here's a real example using the GitHub MCP server:
 
 ```yaml
-name: my-mcp-server
-description: My custom MCP server
+# .agsync/tools/github.yaml
+name: github
+description: GitHub MCP server for interacting with GitHub APIs — repos, issues, PRs, files, and more
 type: mcp
-command: node
-args: ["server.js"]
+command: npx
+args: ["-y", "@modelcontextprotocol/server-github"]
 env:
-  API_KEY: $API_KEY
+  GITHUB_PERSONAL_ACCESS_TOKEN: $GITHUB_PERSONAL_ACCESS_TOKEN
 ```
 
 `agsync sync` generates `.claude/settings.json` and `.cursor/mcp.json` from these definitions. Existing entries in those files are preserved (merge, not overwrite).
@@ -220,7 +266,7 @@ env:
 Env values support `$VAR` and `${VAR}` syntax. During `agsync sync`, these are expanded from the current shell environment. This keeps secrets out of version control — define the reference in your tool YAML and set the actual value in your shell:
 
 ```bash
-export API_KEY=sk-xxx
+export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxx
 agsync sync
 ```
 

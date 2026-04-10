@@ -5,77 +5,86 @@ agsync - Git-native CLI to sync skills and MCP tools across AI coding clients
 USAGE
   agsync <command> [options]
 
-COMMANDS
-  init                                  Scaffold a new agsync project
-  skill add <org/repo> <skill-name>     Add a skill from a GitHub repository
-  skill remove <skill-name>             Remove a skill
-  validate                              Validate config and all definitions
-  plan                                  Preview changes without writing files
-  sync                                  Compile and generate client configs
-  doctor                                Check environment health
-  version                               Show current version and check for updates
-  update                                Update agsync to the latest version
-  help                                  Show this help message
+GETTING STARTED
+  agsync init                             Scaffold a new project with agsync.yaml and sample skill
+  agsync validate                         Validate config and all definitions
+  agsync plan                             Preview changes without writing files
+  agsync sync                             Generate client configs for all targets
 
-EXAMPLES
-  agsync init
-  agsync skill add org/repo my-skill
-  agsync skill add org/repo code-reviewer
-  agsync skill remove code-reviewer
-  agsync validate
-  agsync plan
-  agsync sync
-  agsync doctor
+MANAGING SKILLS
+  agsync skill add <org/repo> <name>      Import a skill from a GitHub repository
+  agsync skill remove <name>              Remove a skill from .agsync/skills/
 
-HIERARCHY
-  agsync supports hierarchical configs in monorepos. Place agsync.yaml at the
-  repo root and in subdirectories. Child configs inherit from parents automatically.
+MAINTENANCE
+  agsync doctor                           Check environment health and client CLIs
+  agsync version                          Show current version and check for updates
+  agsync update                           Update agsync to the latest version
+  agsync help                             Show this help message
+
+COMMON WORKFLOWS
+
+  Set up a new project:
+    agsync init
+    # Edit .agsync/skills/ and .agsync/tools/ as needed
+    agsync sync
+
+  Import and customize a skill from GitHub:
+    agsync skill add Shubhamsaboo/awesome-llm-apps code-reviewer
+    # Edit .agsync/skills/code-reviewer/code-reviewer.yaml
+    agsync sync
+
+  Add an MCP server (e.g. GitHub):
+    # Create .agsync/tools/github.yaml:
+    #   name: github
+    #   type: mcp
+    #   command: npx
+    #   args: ["-y", "@modelcontextprotocol/server-github"]
+    #   env:
+    #     GITHUB_PERSONAL_ACCESS_TOKEN: $GITHUB_PERSONAL_ACCESS_TOKEN
+    export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxx
+    agsync sync
+
+  Check what sync will do before applying:
+    agsync validate && agsync plan
 
 SKILL FORMAT
   Each skill is a directory under .agsync/skills/ containing a YAML file
   matching the directory name:
 
-    .agsync/skills/my-skill/my-skill.yaml
+    .agsync/skills/my-skill/
+    ├── my-skill.yaml      Required: skill definition
+    ├── scripts/           Optional: executable code
+    ├── references/        Optional: documentation loaded on demand
+    └── assets/            Optional: templates, images, data files
 
-  The YAML file defines the skill:
-
+  Minimal YAML:
     name: my-skill
-    description: What this skill does
+    description: What this skill does and when to use it
     instructions: |
       Detailed instructions for the agent.
-    extends:
-      - ./base-skill
-    tools:
-      - tool-name
 
-  Optional directories alongside the YAML (per Agent Skills standard):
-    scripts/       Executable code
-    references/    Documentation loaded on demand
-    assets/        Templates, images, data files
+  Skills can extend other skills:
+    extends:
+      - ./base-skill                       Local skill
+      - github:org/repo/path               Fetched from GitHub
 
 TOOL FORMAT
   Define MCP servers in .agsync/tools/*.yaml:
 
-    name: my-server
-    description: What this tool does
+    name: github
+    description: GitHub MCP server
     type: mcp
-    command: node
-    args: ["server.js"]
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
     env:
-      API_KEY: $API_KEY
+      GITHUB_PERSONAL_ACCESS_TOKEN: $GITHUB_PERSONAL_ACCESS_TOKEN
 
-  Env values support $VAR and \${VAR} syntax. During sync, these are expanded
-  from the current shell environment. If a referenced variable is not set,
-  sync fails with an error. validate warns about unset variables without failing.
-
-PROJECT STRUCTURE
-  agsync.yaml                       Main configuration (repo root)
-  .agsync/skills/*/                 Skill definitions
-  .agsync/tools/*.yaml              MCP tool and CLI definitions
+  Env values support $VAR and \${VAR} syntax, expanded from the shell at
+  sync time. Unset variables cause sync to fail; validate warns without failing.
 
 GENERATED OUTPUT
-  AGENTS.md                         agsync section injected between markers
-  CLAUDE.md                         Injected when claude-code is a target
+  AGENTS.md                         Skill listing injected between agsync markers
+  CLAUDE.md                         Skill listing injected (when claude-code is a target)
   .agents/skills/*/SKILL.md         Codex + Cursor (Agent Skills standard)
   .claude/skills/*/SKILL.md         Claude Code
   .claude/settings.json             MCP config for Claude Code
