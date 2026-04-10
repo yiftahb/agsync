@@ -10,6 +10,7 @@ describe("targetClientSchema", () => {
     expect(targetClientSchema.parse("claude-code")).toBe("claude-code");
     expect(targetClientSchema.parse("codex")).toBe("codex");
     expect(targetClientSchema.parse("cursor")).toBe("cursor");
+    expect(targetClientSchema.parse("windsurf")).toBe("windsurf");
   });
 
   it("rejects invalid targets", () => {

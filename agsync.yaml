@@ -3,6 +3,7 @@ targets:
   - claude-code
   - codex
   - cursor
+  - windsurf
 skills:
   - path: .agsync/skills/*
 tools:

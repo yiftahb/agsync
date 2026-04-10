@@ -1,4 +1,4 @@
-export type TargetClient = "claude-code" | "codex" | "cursor";
+export type TargetClient = "claude-code" | "codex" | "cursor" | "windsurf";
 
 export interface ToolDefinition {
   name: string;

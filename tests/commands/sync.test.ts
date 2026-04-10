@@ -197,6 +197,52 @@ describe("runSync", () => {
     expect(parsed.mcpServers["my-mcp"]).toBeDefined();
   });
 
+  it("creates .windsurf/skills as a symlink to ../.agents/skills", async () => {
+    await setupProject(tempDir);
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        targets: ["codex", "windsurf"],
+        skills: [{ path: ".agsync/skills/*" }],
+        tools: [{ path: ".agsync/tools/*.yaml" }],
+      })
+    );
+    await runSync(tempDir);
+
+    const windsurfSkills = join(tempDir, ".windsurf", "skills");
+    const s = await lstat(windsurfSkills);
+    expect(s.isSymbolicLink()).toBe(true);
+
+    const target = await readlink(windsurfSkills);
+    expect(target).toBe(join("..", ".agents", "skills"));
+  });
+
+  it("generates .windsurf/mcp_config.json", async () => {
+    await setupProject(tempDir);
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        targets: ["windsurf"],
+        skills: [{ path: ".agsync/skills/*" }],
+        tools: [{ path: ".agsync/tools/*.yaml" }],
+      })
+    );
+    await runSync(tempDir);
+
+    const content = await readFile(join(tempDir, ".windsurf", "mcp_config.json"), "utf-8");
+    const parsed = JSON.parse(content);
+    expect(parsed.mcpServers["my-mcp"]).toBeDefined();
+  });
+
+  it("does not create .windsurf/skills symlink when windsurf is not a target", async () => {
+    await setupProject(tempDir);
+    await runSync(tempDir);
+
+    await expect(lstat(join(tempDir, ".windsurf", "skills"))).rejects.toThrow();
+  });
+
   it("expands env variables in tool definitions", async () => {
     const saved = process.env.TEST_SYNC_SECRET;
     process.env.TEST_SYNC_SECRET = "expanded-value";

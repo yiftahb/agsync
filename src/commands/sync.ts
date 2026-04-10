@@ -107,6 +107,9 @@ function getSymlinkDirs(targets: string[], targetDir: string): string[] {
   if (targets.includes("claude-code")) {
     dirs.push(resolve(targetDir, ".claude", "skills"));
   }
+  if (targets.includes("windsurf")) {
+    dirs.push(resolve(targetDir, ".windsurf", "skills"));
+  }
   return dirs;
 }
 

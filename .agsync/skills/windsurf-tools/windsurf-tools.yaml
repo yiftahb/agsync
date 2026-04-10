@@ -1,0 +1,153 @@
+name: windsurf-tools
+description: >
+  Expert in Windsurf MCP tool configuration and .windsurf/mcp_config.json. Use when setting up MCP servers, configuring tools, or troubleshooting Windsurf tool integrations.
+instructions: |
+  # Windsurf Tool Configuration
+
+  You are an expert in configuring MCP tools and integrations for Windsurf (Cascade).
+
+  ## MCP Server Configuration
+
+  Windsurf reads MCP server definitions from `~/.codeium/windsurf/mcp_config.json` (global) or `.windsurf/mcp_config.json` (project-level):
+
+  ```json
+  {
+    "mcpServers": {
+      "my-server": {
+        "command": "node",
+        "args": ["path/to/server.js"],
+        "env": {
+          "API_KEY": "value"
+        }
+      }
+    }
+  }
+  ```
+
+  ### Fields
+
+  | Field | Description |
+  |-------|-------------|
+  | command | The executable to run (e.g., `node`, `python`, `npx`) |
+  | args | Array of command-line arguments |
+  | env | Environment variables passed to the server process |
+
+  ## Transport Types
+
+  Windsurf supports three transport types for MCP servers:
+
+  ### stdio (default)
+  ```json
+  {
+    "mcpServers": {
+      "filesystem": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path"]
+      }
+    }
+  }
+  ```
+
+  ### Streamable HTTP
+  For remote MCP servers:
+  ```json
+  {
+    "mcpServers": {
+      "remote-server": {
+        "serverUrl": "https://api.example.com/mcp",
+        "headers": {
+          "API_KEY": "value"
+        }
+      }
+    }
+  }
+  ```
+
+  ### SSE (Server-Sent Events)
+  ```json
+  {
+    "mcpServers": {
+      "sse-server": {
+        "serverUrl": "https://api.example.com/sse"
+      }
+    }
+  }
+  ```
+
+  ## Config Interpolation
+
+  The `mcp_config.json` supports variable interpolation in `command`, `args`, `env`, `serverUrl`, `url`, and `headers` fields:
+
+  | Pattern | Description | Example |
+  |---------|-------------|---------|
+  | `${env:VAR_NAME}` | Replaced with environment variable value | `${env:AUTH_TOKEN}` |
+  | `${file:/path/to/file}` | Replaced with file contents (trimmed) | `${file:~/.secrets/key.txt}` |
+
+  ### Environment variable example
+  ```json
+  {
+    "mcpServers": {
+      "remote-http-mcp": {
+        "serverUrl": "https://api.example.com/mcp",
+        "headers": {
+          "API_KEY": "Bearer ${env:AUTH_TOKEN}"
+        }
+      }
+    }
+  }
+  ```
+
+  ### File interpolation example
+  ```json
+  {
+    "mcpServers": {
+      "my-server": {
+        "command": "node",
+        "args": ["server.js"],
+        "env": {
+          "API_KEY": "${file:~/.secrets/api_key.txt}"
+        }
+      }
+    }
+  }
+  ```
+
+  ## MCP Configuration Locations
+
+  | Location | Scope |
+  |----------|-------|
+  | `.windsurf/mcp_config.json` | Project-level (checked into repo) |
+  | `~/.codeium/windsurf/mcp_config.json` | User-level (global) |
+
+  ## Tool Limits
+
+  Cascade has a limit of 100 total tools across all MCP servers. Use the MCP settings panel to toggle individual tools on or off.
+
+  ## OAuth Support
+
+  Windsurf supports OAuth for each transport type (stdio, HTTP, SSE).
+
+  ## With agsync
+
+  When using agsync, define tools in `.agsync/tools/*.yaml`:
+
+  ```yaml
+  name: my-server
+  description: My MCP server
+  type: mcp
+  command: node
+  args: ["server.js"]
+  env:
+    API_KEY: "value"
+  ```
+
+  Running `agsync sync` generates `.windsurf/mcp_config.json` from these definitions.
+
+  ## Troubleshooting
+
+  - Verify the MCP server binary is installed and accessible
+  - Check that environment variables are set correctly
+  - For HTTP servers, the URL should end with `/mcp`
+  - Test the server standalone before configuring it in Windsurf
+  - Restart Windsurf after changing `mcp_config.json`
+  - Cascade supports up to 100 total tools across all servers

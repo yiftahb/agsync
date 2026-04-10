@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  Git-native CLI to sync skills and MCP tools across Claude Code, Codex, and Cursor.
+  Git-native CLI to sync skills and MCP tools across Claude Code, Codex, Cursor, and Windsurf.
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@ Define your AI agent skills and tool configurations once in `.agsync/`, then gen
 | Cursor | ✅ |
 | Codex | ✅ |
 | OpenCode | Coming Soon |
-| Windsurf | Coming Soon |
+| Windsurf | ✅ |
 | Cline | Coming Soon |
 | Aider | Coming Soon |
 | GitHub Copilot | Coming Soon |
@@ -65,19 +65,21 @@ project/
 │
 ├── AGENTS.md                            # Skill listing injected (agsync section)
 ├── CLAUDE.md                            # Skill listing injected (agsync section)
-├── .agents/skills/*/SKILL.md            # Generated for Codex + Cursor
-├── .claude/skills/*/SKILL.md            # Generated for Claude Code
+├── .agents/skills/*/SKILL.md            # Canonical skill output
+├── .claude/skills/                      # Symlink to .agents/skills/ (Claude Code)
 ├── .claude/settings.json                # Generated MCP config (Claude Code)
-└── .cursor/mcp.json                     # Generated MCP config (Cursor)
+├── .cursor/mcp.json                     # Generated MCP config (Cursor)
+├── .windsurf/skills/                    # Symlink to .agents/skills/ (Windsurf)
+└── .windsurf/mcp_config.json            # Generated MCP config (Windsurf)
 ```
 
 ## How It Works
 
 agsync reads canonical skill and tool definitions from `.agsync/`, resolves inheritance chains, and generates the native format each client expects:
 
-- **Skills** are generated as `SKILL.md` files in `.agents/skills/` (Codex + Cursor, open [Agent Skills](https://agentskills.io) standard) and `.claude/skills/` (Claude Code)
+- **Skills** are generated as `SKILL.md` files in `.agents/skills/` (canonical output). Client-specific directories (`.claude/skills/`, `.windsurf/skills/`) are symlinks to `.agents/skills/`
 - **AGENTS.md and CLAUDE.md** both receive the same `<!-- agsync:begin -->` / `<!-- agsync:end -->` section with a skill listing. Manual content outside the markers is preserved. CLAUDE.md is only generated when `claude-code` is a target
-- **MCP configs** are merged into `.claude/settings.json` and `.cursor/mcp.json` (existing entries preserved, not overwritten)
+- **MCP configs** are merged into `.claude/settings.json`, `.cursor/mcp.json`, and `.windsurf/mcp_config.json` (existing entries preserved, not overwritten)
 
 ## Commands
 
@@ -273,7 +275,7 @@ env:
   GITHUB_PERSONAL_ACCESS_TOKEN: $GITHUB_PERSONAL_ACCESS_TOKEN
 ```
 
-`agsync sync` generates `.claude/settings.json` and `.cursor/mcp.json` from these definitions. Existing entries in those files are preserved (merge, not overwrite).
+`agsync sync` generates `.claude/settings.json`, `.cursor/mcp.json`, and `.windsurf/mcp_config.json` from these definitions. Existing entries in those files are preserved (merge, not overwrite).
 
 ### Environment Variable Expansion
 
@@ -286,7 +288,7 @@ agsync sync
 
 If a referenced variable is not set, sync will fail with a clear error. `agsync validate` will warn about unset variables without failing.
 
-Add generated config files (`.claude/settings.json`, `.cursor/mcp.json`) to `.gitignore` when using env expansion to avoid committing resolved secrets.
+Add generated config files (`.claude/settings.json`, `.cursor/mcp.json`, `.windsurf/mcp_config.json`) to `.gitignore` when using env expansion to avoid committing resolved secrets.
 
 ## Monorepo Support
 
@@ -319,6 +321,8 @@ agsync ships with skills for understanding each client's skill and tool systems:
 | `claude-tools` | Claude Code MCP configuration |
 | `cursor-tools` | Cursor MCP configuration |
 | `codex-tools` | Codex tool dependencies |
+| `windsurf-skills` | Windsurf Agent Skills |
+| `windsurf-tools` | Windsurf MCP configuration |
 
 Import any of them:
 
@@ -336,6 +340,7 @@ targets:
   - claude-code
   - codex
   - cursor
+  - windsurf
 skills:
   - path: .agsync/skills/*
 tools:
