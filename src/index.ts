@@ -8,15 +8,15 @@ import { getExtendedHelp } from "@/commands/help";
 import { runAdd } from "@/commands/add";
 import { runRemove } from "@/commands/remove";
 import { runUpdate } from "@/commands/update";
-
-declare const __VERSION__: string;
+import { runVersion } from "@/commands/version";
+import { CURRENT_VERSION } from "@/utils/version";
 
 const program = new Command();
 
 program
   .name("agsync")
   .description("Git-native CLI to sync skills and MCP tools across AI coding clients")
-  .version(__VERSION__);
+  .version(CURRENT_VERSION);
 
 program
   .command("init")
@@ -147,6 +147,18 @@ skill
     try {
       const removed = await runRemove(opts.dir, skillName);
       console.log(`Removed skill "${skillName}" from ${removed}`);
+    } catch (err: unknown) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("version")
+  .description("Show current version and check for updates")
+  .action(async () => {
+    try {
+      await runVersion();
     } catch (err: unknown) {
       console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);

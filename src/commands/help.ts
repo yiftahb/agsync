@@ -13,6 +13,8 @@ COMMANDS
   plan                                  Preview changes without writing files
   sync                                  Compile and generate client configs
   doctor                                Check environment health
+  version                               Show current version and check for updates
+  update                                Update agsync to the latest version
   help                                  Show this help message
 
 EXAMPLES

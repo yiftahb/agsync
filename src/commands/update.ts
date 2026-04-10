@@ -1,26 +1,16 @@
 import { execSync } from "node:child_process";
-
-declare const __VERSION__: string;
-
-async function getLatestVersion(): Promise<string> {
-  const res = await fetch("https://registry.npmjs.org/agsync-cli/latest");
-  if (!res.ok) {
-    throw new Error(`Failed to check latest version (HTTP ${res.status})`);
-  }
-  const data = (await res.json()) as { version: string };
-  return data.version;
-}
+import { CURRENT_VERSION, getLatestVersion } from "@/utils/version";
 
 export async function runUpdate(): Promise<void> {
-  console.log(`Current version: ${__VERSION__}`);
+  console.log(`Current version: ${CURRENT_VERSION}`);
   const latest = await getLatestVersion();
 
-  if (latest === __VERSION__) {
+  if (latest === CURRENT_VERSION) {
     console.log("Already on the latest version.");
     return;
   }
 
-  console.log(`Updating: ${__VERSION__} → ${latest}`);
+  console.log(`Updating: ${CURRENT_VERSION} → ${latest}`);
   try {
     execSync("npm install -g agsync-cli@latest", { stdio: "inherit" });
   } catch (_) {
