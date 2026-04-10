@@ -22,7 +22,7 @@ export interface SkillDefinition {
   name: string;
   description: string;
   extends?: string[];
-  instructions: string;
+  instructions?: string;
   tools?: string[];
   source?: SkillSource;
 }

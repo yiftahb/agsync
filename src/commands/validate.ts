@@ -2,6 +2,19 @@ import { loadHierarchicalConfig } from "@/loader/hierarchy";
 import { findEnvReferences } from "@/utils/env";
 import type { ValidationError, LoadedConfig } from "@/types";
 
+function validateSkillCompleteness(loaded: LoadedConfig): ValidationError[] {
+  const errors: ValidationError[] = [];
+  for (const skill of loaded.skills) {
+    if (!skill.instructions && !skill.source) {
+      errors.push({
+        file: `skill: ${skill.name}`,
+        message: `Must have either "instructions" or "source" (or both)`,
+      });
+    }
+  }
+  return errors;
+}
+
 function validateCrossReferences(loaded: LoadedConfig): ValidationError[] {
   const errors: ValidationError[] = [];
   const toolNames = new Set(loaded.tools.map((t) => t.name));
@@ -65,6 +78,7 @@ export async function runValidate(targetDir: string): Promise<ValidationError[]>
 
   const errors: ValidationError[] = [];
   errors.push(...validateUniqueNames(loaded));
+  errors.push(...validateSkillCompleteness(loaded));
   errors.push(...validateCrossReferences(loaded));
   errors.push(...validateEnvReferences(loaded));
 

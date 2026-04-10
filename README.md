@@ -87,7 +87,7 @@ Creates `agsync.yaml` and the `.agsync/` directory structure with a sample skill
 
 ### `agsync skill add <org/repo> <skill-name>`
 
-Imports a skill from a GitHub repository. Fetches the skill directory, converts `SKILL.md` to agsync's YAML format, downloads supporting files (scripts, references, assets), and tracks provenance via a `source` field.
+Registers a skill from a GitHub repository. Creates a lightweight YAML stub with the skill's name, description, and source reference. The actual content (instructions, scripts, references) is fetched during `agsync sync`.
 
 ```bash
 # Import from any repo that has skills
@@ -207,16 +207,13 @@ Import skills from any GitHub repo that follows the [Agent Skills](https://agent
 agsync skill add Shubhamsaboo/awesome-llm-apps code-reviewer
 ```
 
-This fetches the skill, converts `SKILL.md` to agsync's YAML format, downloads supporting files, and tracks where it came from:
+This creates a lightweight stub that points to the source. During `agsync sync`, the remote SKILL.md and supporting files (scripts, references, assets) are fetched automatically:
 
 ```yaml
-# .agsync/skills/code-reviewer/code-reviewer.yaml (auto-generated)
+# .agsync/skills/code-reviewer/code-reviewer.yaml (created by skill add)
 name: code-reviewer
 description: >
   Reviews code for quality, security, and performance.
-instructions: |
-  You are an expert code reviewer.
-  ...
 source:
   registry: github
   org: Shubhamsaboo
@@ -224,24 +221,41 @@ source:
   path: awesome_agent_skills/code-reviewer
 ```
 
-### Skill extension
+### Extending an imported skill
 
-Skills can inherit from other skills. Base instructions are concatenated, tools are union-merged, and the extending skill's name and description take precedence.
+Add `instructions` to a sourced skill to extend it. Your instructions are appended after the remote skill's instructions:
+
+```yaml
+# .agsync/skills/code-reviewer/code-reviewer.yaml
+name: code-reviewer
+description: >
+  Security-focused code reviewer for our team.
+source:
+  registry: github
+  org: Shubhamsaboo
+  repo: awesome-llm-apps
+  path: awesome_agent_skills/code-reviewer
+instructions: |
+  Additionally, focus on OWASP Top 10 vulnerabilities.
+  Flag any hardcoded secrets or credentials.
+tools:
+  - github
+```
+
+### Skill inheritance with extends
+
+Skills can also inherit from local or remote skills via `extends`. Base instructions are concatenated, tools are union-merged, and the extending skill's name and description take precedence.
 
 ```yaml
 # .agsync/skills/security-reviewer/security-reviewer.yaml
 name: security-reviewer
 description: >
-  Security-focused code reviewer. Use for security audits and
-  vulnerability assessments.
+  Security-focused code reviewer. Use for security audits.
 extends:
   - ./code-reviewer                        # Local skill in .agsync/skills/
   - github:your-org/shared-skills/owasp    # Fetched from GitHub, cached locally
 instructions: |
   Focus specifically on OWASP Top 10 vulnerabilities.
-  Flag any hardcoded secrets or credentials.
-tools:
-  - github
 ```
 
 ## MCP Tool Definitions

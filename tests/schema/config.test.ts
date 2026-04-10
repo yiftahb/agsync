@@ -80,10 +80,9 @@ describe("skillDefinitionSchema", () => {
     expect(result.source?.org).toBe("org");
   });
 
-  it("rejects a skill without instructions", () => {
-    expect(() =>
-      skillDefinitionSchema.parse({ name: "bad", description: "no instructions" })
-    ).toThrow();
+  it("accepts a skill without instructions (optional when source present)", () => {
+    const result = skillDefinitionSchema.parse({ name: "sourced", description: "remote skill" });
+    expect(result.instructions).toBeUndefined();
   });
 });
 

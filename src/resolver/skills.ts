@@ -3,6 +3,12 @@ import { resolve, dirname } from "node:path";
 import { existsSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import { skillDefinitionSchema } from "@/schema/config";
+import {
+  fetchGitHubDirectory,
+  fetchFileContent,
+  downloadSupportingFiles,
+  parseSkillMd,
+} from "@/utils/github";
 import type { SkillDefinition, ResolvedSkill } from "@/types";
 
 const GITHUB_PREFIX = "github:";
@@ -78,6 +84,38 @@ async function loadExtendedSkill(
   throw new Error(`Unknown skill reference format: ${ref}`);
 }
 
+async function resolveSourceSkill(
+  skill: SkillDefinition,
+  skillsDir: string
+): Promise<{ instructions: string; description: string }> {
+  if (!skill.source) {
+    throw new Error(`Skill "${skill.name}" has no source to resolve`);
+  }
+
+  const { org, repo, path: remotePath } = skill.source;
+  const localDir = resolve(skillsDir, skill.name);
+
+  const entries = await fetchGitHubDirectory(org, repo, remotePath);
+  const skillMdEntry = entries.find((e) => e.name === "SKILL.md");
+
+  let remoteInstructions = "";
+  let remoteDescription = skill.description;
+
+  if (skillMdEntry && skillMdEntry.download_url) {
+    const content = await fetchFileContent(skillMdEntry.download_url);
+    const parsed = parseSkillMd(content);
+    remoteInstructions = parsed.instructions;
+    remoteDescription = parsed.description || skill.description;
+  }
+
+  await downloadSupportingFiles(org, repo, remotePath, localDir, [
+    "SKILL.md",
+    `${skill.name}.yaml`,
+  ]);
+
+  return { instructions: remoteInstructions, description: remoteDescription };
+}
+
 function mergeSkills(base: ResolvedSkill, overlay: SkillDefinition): ResolvedSkill {
   return {
     name: overlay.name,
@@ -106,11 +144,28 @@ async function resolveSkillChain(
   detectCircularExtends(skill.name, visited);
   visited.add(skill.name);
 
+  let effectiveInstructions = skill.instructions ?? "";
+  let effectiveDescription = skill.description;
+
+  if (skill.source) {
+    const remote = await resolveSourceSkill(skill, skillsDir);
+    if (skill.instructions) {
+      effectiveInstructions = [remote.instructions, skill.instructions]
+        .filter(Boolean)
+        .join("\n\n");
+    } else {
+      effectiveInstructions = remote.instructions;
+    }
+    if (!skill.description || skill.description === effectiveDescription) {
+      effectiveDescription = remote.description;
+    }
+  }
+
   if (!skill.extends || skill.extends.length === 0) {
     return {
       name: skill.name,
-      description: skill.description,
-      instructions: skill.instructions,
+      description: effectiveDescription,
+      instructions: effectiveInstructions,
       tools: skill.tools ?? [],
       extendsChain: [skill.name],
     };
@@ -118,7 +173,7 @@ async function resolveSkillChain(
 
   let resolved: ResolvedSkill = {
     name: skill.name,
-    description: skill.description,
+    description: effectiveDescription,
     instructions: "",
     tools: [],
     extendsChain: [],
@@ -137,7 +192,13 @@ async function resolveSkillChain(
     };
   }
 
-  return mergeSkills(resolved, skill);
+  const overlayWithResolved: SkillDefinition = {
+    ...skill,
+    instructions: effectiveInstructions,
+    description: effectiveDescription,
+  };
+
+  return mergeSkills(resolved, overlayWithResolved);
 }
 
 export async function resolveAllSkills(

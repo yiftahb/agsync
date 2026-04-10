@@ -12,7 +12,7 @@ GETTING STARTED
   agsync sync                             Generate client configs for all targets
 
 MANAGING SKILLS
-  agsync skill add <org/repo> <name>      Import a skill from a GitHub repository
+  agsync skill add <org/repo> <name>      Register a skill from a GitHub repository
   agsync skill remove <name>              Remove a skill from .agsync/skills/
 
 MAINTENANCE
@@ -28,9 +28,16 @@ COMMON WORKFLOWS
     # Edit .agsync/skills/ and .agsync/tools/ as needed
     agsync sync
 
-  Import and customize a skill from GitHub:
+  Import a skill from GitHub:
     agsync skill add Shubhamsaboo/awesome-llm-apps code-reviewer
-    # Edit .agsync/skills/code-reviewer/code-reviewer.yaml
+    # This creates a stub YAML with the source reference
+    # Running sync fetches the remote content and generates output
+    agsync sync
+
+  Extend an imported skill with custom instructions:
+    agsync skill add Shubhamsaboo/awesome-llm-apps code-reviewer
+    # Add "instructions:" to the generated YAML to extend the skill
+    # Your instructions are appended after the remote skill's instructions
     agsync sync
 
   Add an MCP server (e.g. GitHub):
@@ -57,13 +64,33 @@ SKILL FORMAT
     ├── references/        Optional: documentation loaded on demand
     └── assets/            Optional: templates, images, data files
 
-  Minimal YAML:
+  Local skill (with instructions):
     name: my-skill
     description: What this skill does and when to use it
     instructions: |
       Detailed instructions for the agent.
 
-  Skills can extend other skills:
+  Imported skill (source only, content fetched during sync):
+    name: my-skill
+    description: What this skill does
+    source:
+      registry: github
+      org: org-name
+      repo: repo-name
+      path: path/to/skill
+
+  Extended imported skill (source + local instructions appended):
+    name: my-skill
+    description: What this skill does
+    source:
+      registry: github
+      org: org-name
+      repo: repo-name
+      path: path/to/skill
+    instructions: |
+      Additional instructions appended to the remote skill.
+
+  Skills can also inherit via extends:
     extends:
       - ./base-skill                       Local skill
       - github:org/repo/path               Fetched from GitHub
