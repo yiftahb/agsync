@@ -9,7 +9,7 @@ describe("ClaudeCodeConverter", () => {
     expect(converter.name).toBe("claude-code");
   });
 
-  it("generates per-skill markdown files under .claude/skills/", () => {
+  it("does not generate skill files (handled by sync)", () => {
     const config: ResolvedConfig = {
       targets: ["claude-code"],
       skills: [
@@ -25,13 +25,8 @@ describe("ClaudeCodeConverter", () => {
     };
 
     const output = converter.convert(config, "/project");
-    const skillFiles = output.files.filter((f) => f.path.endsWith("SKILL.md"));
-    expect(skillFiles).toHaveLength(1);
-    expect(skillFiles[0].path).toBe(
-      join("/project", ".claude", "skills", "reviewer", "SKILL.md")
-    );
-    expect(skillFiles[0].content).toContain("name: reviewer");
-    expect(skillFiles[0].content).toContain("Review code carefully");
+    const skillFiles = output.files.filter((f) => f.path.includes("skills"));
+    expect(skillFiles).toHaveLength(0);
   });
 
   it("generates .claude/settings.json for MCP tools", () => {
@@ -77,5 +72,11 @@ describe("ClaudeCodeConverter", () => {
     const output = converter.convert(config, "/project");
     const settingsFile = output.files.find((f) => f.path.endsWith("settings.json"));
     expect(settingsFile).toBeUndefined();
+  });
+
+  it("does not include .claude/skills in output paths", () => {
+    const paths = converter.getOutputPaths("/project");
+    expect(paths).not.toContainEqual(join("/project", ".claude", "skills"));
+    expect(paths).toContainEqual(join("/project", ".claude", "settings.json"));
   });
 });

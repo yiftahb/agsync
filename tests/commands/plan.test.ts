@@ -81,15 +81,20 @@ describe("buildSyncPlan", () => {
     expect(deletes).toEqual([{ name: "old-skill", operation: "delete" }]);
   });
 
-  it("plans file creation for non-skill files", async () => {
+  it("plans file creation for skill files and symlinks", async () => {
     await setupProject(tempDir);
     const plan = await buildSyncPlan(tempDir);
 
     const paths = plan.files.map((f) => f.path);
+    expect(paths).toContainEqual(join(tempDir, ".agents", "skills", "helper", "SKILL.md"));
     expect(paths).toContainEqual(join(tempDir, "AGENTS.md"));
     expect(paths).toContainEqual(join(tempDir, "CLAUDE.md"));
     expect(paths).toContainEqual(join(tempDir, ".claude", "settings.json"));
     expect(paths).toContainEqual(join(tempDir, ".cursor", "mcp.json"));
+
+    const symlinkEntry = plan.files.find((f) => f.path === join(tempDir, ".claude", "skills"));
+    expect(symlinkEntry).toBeDefined();
+    expect(symlinkEntry!.symlink).toBe(join("..", ".agents", "skills"));
   });
 
   it("plans updates when files already exist", async () => {
@@ -171,14 +176,14 @@ describe("buildSyncPlan", () => {
     await expect(buildSyncPlan(tempDir)).rejects.toThrow("Validation failed");
   });
 
-  it("detects stale skills across all target output dirs", async () => {
+  it("detects stale skills in canonical output dir", async () => {
     await setupProject(tempDir);
-    await mkdir(join(tempDir, ".claude", "skills", "stale-claude"), { recursive: true });
-    await writeFile(join(tempDir, ".claude", "skills", "stale-claude", "SKILL.md"), "x");
+    await mkdir(join(tempDir, ".agents", "skills", "stale-skill"), { recursive: true });
+    await writeFile(join(tempDir, ".agents", "skills", "stale-skill", "SKILL.md"), "x");
 
     const plan = await buildSyncPlan(tempDir);
     const deletes = plan.skills.filter((s) => s.operation === "delete");
-    expect(deletes.some((s) => s.name === "stale-claude")).toBe(true);
+    expect(deletes.some((s) => s.name === "stale-skill")).toBe(true);
   });
 });
 
@@ -220,8 +225,33 @@ describe("formatPlan", () => {
     expect(output).toContain("+ AGENTS.md");
   });
 
+  it("formats symlink entries distinctly", () => {
+    const plan = {
+      skills: [{ name: "s", operation: "create" as const }],
+      files: [
+        {
+          path: "/project/.claude/skills",
+          content: "",
+          existing: "",
+          operation: "create" as const,
+          symlink: "../.agents/skills",
+        },
+      ],
+      skillOutputDirs: [],
+      canonicalSkillsDir: "/project/.agsync/skills",
+      warnings: [],
+    };
+    const output = formatPlan(plan, "/project");
+
+    expect(output).toContain("(symlink)");
+    expect(output).toContain("../.agents/skills");
+  });
+
   it("reports no changes when plan is empty", () => {
-    const output = formatPlan({ skills: [], files: [], skillOutputDirs: [], canonicalSkillsDir: "/project/.agsync/skills", warnings: [] }, "/project");
+    const output = formatPlan(
+      { skills: [], files: [], skillOutputDirs: [], canonicalSkillsDir: "/project/.agsync/skills", warnings: [] },
+      "/project"
+    );
     expect(output).toContain("No changes needed");
   });
 });

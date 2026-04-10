@@ -77,6 +77,7 @@ export interface PlannedFile {
   content: string;
   operation: PlannedOperation;
   existing: string;
+  symlink?: string;
 }
 
 export interface SyncPlan {

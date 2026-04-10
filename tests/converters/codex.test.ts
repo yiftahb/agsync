@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { CodexConverter } from "@/converters/codex";
+import { buildSkillMd } from "@/converters/base";
 import type { ResolvedConfig } from "@/types";
 
 describe("CodexConverter", () => {
@@ -9,7 +10,7 @@ describe("CodexConverter", () => {
     expect(converter.name).toBe("codex");
   });
 
-  it("generates SKILL.md per skill under .agents/skills/<name>/", () => {
+  it("returns empty files (skills handled by sync)", () => {
     const config: ResolvedConfig = {
       targets: ["codex"],
       skills: [
@@ -25,12 +26,17 @@ describe("CodexConverter", () => {
     };
 
     const output = converter.convert(config, "/project");
-    expect(output.files).toHaveLength(1);
-    expect(output.files[0].path).toBe(
-      join("/project", ".agents", "skills", "helper", "SKILL.md")
-    );
+    expect(output.files).toHaveLength(0);
   });
 
+  it("returns output paths including .agents/skills and AGENTS.md", () => {
+    const paths = converter.getOutputPaths("/project");
+    expect(paths).toContain(join("/project", "AGENTS.md"));
+    expect(paths).toContain(join("/project", ".agents", "skills"));
+  });
+});
+
+describe("buildSkillMd", () => {
   it("generates SKILL.md with correct frontmatter", () => {
     const config: ResolvedConfig = {
       targets: ["codex"],
@@ -46,15 +52,14 @@ describe("CodexConverter", () => {
       tools: [],
     };
 
-    const output = converter.convert(config, "/project");
-    const content = output.files[0].content;
+    const content = buildSkillMd(config.skills[0], config);
     expect(content).toContain("---");
     expect(content).toContain("name: test");
     expect(content).toContain("description: Test skill");
     expect(content).toContain("Do testing");
   });
 
-  it("includes tool references in SKILL.md", () => {
+  it("includes tool references", () => {
     const config: ResolvedConfig = {
       targets: ["codex"],
       skills: [
@@ -69,13 +74,7 @@ describe("CodexConverter", () => {
       tools: [{ name: "my-tool", description: "A tool", type: "cli", command: "echo" }],
     };
 
-    const output = converter.convert(config, "/project");
-    expect(output.files[0].content).toContain("**my-tool**");
-  });
-
-  it("returns output paths including .agents/skills and AGENTS.md", () => {
-    const paths = converter.getOutputPaths("/project");
-    expect(paths).toContain(join("/project", "AGENTS.md"));
-    expect(paths).toContain(join("/project", ".agents", "skills"));
+    const content = buildSkillMd(config.skills[0], config);
+    expect(content).toContain("**my-tool**");
   });
 });

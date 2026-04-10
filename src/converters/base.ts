@@ -1,4 +1,31 @@
-import type { ResolvedConfig, ConvertedOutput } from "@/types";
+import type { ResolvedConfig, ResolvedSkill, ConvertedOutput } from "@/types";
+
+export function buildSkillMd(skill: ResolvedSkill, config: ResolvedConfig): string {
+  const lines: string[] = [];
+
+  lines.push("---");
+  lines.push(`name: ${skill.name}`);
+  lines.push(`description: ${skill.description}`);
+  lines.push("---");
+  lines.push("");
+  lines.push(skill.instructions.trim());
+
+  if (skill.tools.length > 0) {
+    lines.push("");
+    lines.push("## Available Tools");
+    lines.push("");
+    for (const toolName of skill.tools) {
+      const tool = config.tools.find((t) => t.name === toolName);
+      if (tool) {
+        lines.push(`- **${tool.name}**: ${tool.description}`);
+      } else {
+        lines.push(`- ${toolName}`);
+      }
+    }
+  }
+
+  return lines.join("\n");
+}
 
 export abstract class BaseAgentConverter {
   abstract readonly name: string;

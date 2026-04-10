@@ -95,9 +95,6 @@ ESLint uses flat config (`eslint.config.mjs`) with typescript-eslint. Strict Typ
 
 - **claude-tools**: Expert in Claude Code MCP tool configuration and .claude/settings.json. Use when setting up MCP servers, configuring tools, or troubleshooting Claude Code tool integrations.
 
-- **code-reviewer**: Thorough code review with focus on security, performance, and best practices.
-Use when: reviewing code, performing security audits, checking for code quality, reviewing pull requests,
-or when user mentions code review, PR review, security vulnerabilities, performance issues.
 - **codex-skills**: Expert in OpenAI Codex Agent Skills. Use when creating, editing, or troubleshooting Codex skills under .agents/skills/.
 
 - **codex-tools**: Expert in Codex MCP tool configuration and agents/openai.yaml tool dependencies. Use when setting up MCP servers, configuring tools, or troubleshooting Codex tool integrations.

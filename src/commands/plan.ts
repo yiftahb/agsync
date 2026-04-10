@@ -34,7 +34,11 @@ export function formatPlan(plan: SyncPlan, baseDir: string): string {
     lines.push("Files:");
     for (const f of changedFiles) {
       const prefix = f.operation === "create" ? "+" : f.operation === "update" ? "~" : "-";
-      lines.push(`  ${prefix} ${relative(baseDir, f.path)}`);
+      if (f.symlink) {
+        lines.push(`  ${prefix} ${relative(baseDir, f.path)} -> ${f.symlink} (symlink)`);
+      } else {
+        lines.push(`  ${prefix} ${relative(baseDir, f.path)}`);
+      }
     }
   }
 

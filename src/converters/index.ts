@@ -1,4 +1,4 @@
-import { BaseAgentConverter } from "@/converters/base";
+import { BaseAgentConverter, buildSkillMd } from "@/converters/base";
 import { ClaudeCodeConverter } from "@/converters/claude-code";
 import { CodexConverter } from "@/converters/codex";
 import { CursorConverter } from "@/converters/cursor";
@@ -22,4 +22,4 @@ export function getAllConverters(targets: TargetClient[]): BaseAgentConverter[] 
   return targets.map(getConverter);
 }
 
-export { BaseAgentConverter, ClaudeCodeConverter, CodexConverter, CursorConverter };
+export { BaseAgentConverter, buildSkillMd, ClaudeCodeConverter, CodexConverter, CursorConverter };

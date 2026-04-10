@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, mkdir, readFile, rm, readdir } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir, readFile, rm, readdir, lstat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { stringify as toYaml } from "yaml";
@@ -154,56 +154,63 @@ async function setupSourceSkillProject(dir: string) {
 }
 
 describe("sync supporting files", () => {
-  it("copies rules/ directory from canonical source to all output dirs", async () => {
+  it("copies rules/ directory to canonical .agents/skills output", async () => {
     globalThis.fetch = createMockFetch() as unknown as typeof fetch;
     await setupSourceSkillProject(tempDir);
     await runSync(tempDir);
 
-    for (const outputBase of [
-      join(tempDir, ".claude", "skills", "code-reviewer"),
-      join(tempDir, ".agents", "skills", "code-reviewer"),
-    ]) {
-      const rulesDir = join(outputBase, "rules");
-      const ruleFiles = await readdir(rulesDir);
-      expect(ruleFiles.sort()).toEqual(Object.keys(RULE_FILES).sort());
+    const rulesDir = join(tempDir, ".agents", "skills", "code-reviewer", "rules");
+    const ruleFiles = await readdir(rulesDir);
+    expect(ruleFiles.sort()).toEqual(Object.keys(RULE_FILES).sort());
 
-      for (const [name, expectedContent] of Object.entries(RULE_FILES)) {
-        const content = await readFile(join(rulesDir, name), "utf-8");
-        expect(content).toBe(expectedContent);
-      }
+    for (const [name, expectedContent] of Object.entries(RULE_FILES)) {
+      const content = await readFile(join(rulesDir, name), "utf-8");
+      expect(content).toBe(expectedContent);
     }
   });
 
-  it("copies AGENTS.md to output dirs alongside converter-generated SKILL.md", async () => {
+  it("makes rules/ accessible through .claude/skills symlink", async () => {
     globalThis.fetch = createMockFetch() as unknown as typeof fetch;
     await setupSourceSkillProject(tempDir);
     await runSync(tempDir);
 
-    for (const outputBase of [
-      join(tempDir, ".claude", "skills", "code-reviewer"),
-      join(tempDir, ".agents", "skills", "code-reviewer"),
-    ]) {
-      const agentsMd = await readFile(join(outputBase, "AGENTS.md"), "utf-8");
-      expect(agentsMd).toBe(AGENTS_MD_CONTENT);
+    const s = await lstat(join(tempDir, ".claude", "skills"));
+    expect(s.isSymbolicLink()).toBe(true);
 
-      const skillMd = await readFile(join(outputBase, "SKILL.md"), "utf-8");
-      expect(skillMd).toContain("name: code-reviewer");
-      expect(skillMd).toContain("You are an expert code reviewer.");
+    const rulesDir = join(tempDir, ".claude", "skills", "code-reviewer", "rules");
+    const ruleFiles = await readdir(rulesDir);
+    expect(ruleFiles.sort()).toEqual(Object.keys(RULE_FILES).sort());
+
+    for (const [name, expectedContent] of Object.entries(RULE_FILES)) {
+      const content = await readFile(join(rulesDir, name), "utf-8");
+      expect(content).toBe(expectedContent);
     }
   });
 
-  it("does not copy the YAML stub to output dirs", async () => {
+  it("copies AGENTS.md to canonical dir alongside SKILL.md", async () => {
     globalThis.fetch = createMockFetch() as unknown as typeof fetch;
     await setupSourceSkillProject(tempDir);
     await runSync(tempDir);
 
-    for (const outputBase of [
-      join(tempDir, ".claude", "skills", "code-reviewer"),
-      join(tempDir, ".agents", "skills", "code-reviewer"),
-    ]) {
-      const entries = await readdir(outputBase);
-      expect(entries).not.toContain("code-reviewer.yaml");
-    }
+    const outputBase = join(tempDir, ".agents", "skills", "code-reviewer");
+
+    const agentsMd = await readFile(join(outputBase, "AGENTS.md"), "utf-8");
+    expect(agentsMd).toBe(AGENTS_MD_CONTENT);
+
+    const skillMd = await readFile(join(outputBase, "SKILL.md"), "utf-8");
+    expect(skillMd).toContain("name: code-reviewer");
+    expect(skillMd).toContain("You are an expert code reviewer.");
+  });
+
+  it("does not copy the YAML stub to output dir", async () => {
+    globalThis.fetch = createMockFetch() as unknown as typeof fetch;
+    await setupSourceSkillProject(tempDir);
+    await runSync(tempDir);
+
+    const entries = await readdir(
+      join(tempDir, ".agents", "skills", "code-reviewer")
+    );
+    expect(entries).not.toContain("code-reviewer.yaml");
   });
 
   it("downloads supporting files to canonical .agsync dir during resolve", async () => {
@@ -228,6 +235,6 @@ describe("sync supporting files", () => {
     const { written } = await runSync(tempDir);
 
     const ruleRelated = written.filter((p) => p.includes("rules/"));
-    expect(ruleRelated.length).toBeGreaterThanOrEqual(Object.keys(RULE_FILES).length * 2);
+    expect(ruleRelated.length).toBeGreaterThanOrEqual(Object.keys(RULE_FILES).length);
   });
 });

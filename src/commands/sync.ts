@@ -1,8 +1,8 @@
-import { mkdir, writeFile, readFile, rm, readdir, stat as fsStat, copyFile } from "node:fs/promises";
-import { resolve, dirname } from "node:path";
+import { mkdir, writeFile, readFile, rm, readdir, stat as fsStat, copyFile, symlink, lstat } from "node:fs/promises";
+import { resolve, dirname, relative } from "node:path";
 import { loadHierarchicalConfig } from "@/loader/hierarchy";
 import { resolveAllSkills } from "@/resolver/skills";
-import { getAllConverters } from "@/converters";
+import { getAllConverters, buildSkillMd } from "@/converters";
 import { runValidate } from "@/commands/validate";
 import { expandToolEnv } from "@/utils/env";
 import type { ResolvedConfig, LoadedConfig, SyncPlan, PlannedFile, PlannedSkill } from "@/types";
@@ -88,12 +88,11 @@ async function readFileOrEmpty(filePath: string): Promise<string> {
 }
 
 async function listSubdirectories(dir: string): Promise<string[]> {
-  const { readdir, stat } = await import("node:fs/promises");
   try {
     const entries = await readdir(dir);
     const dirs: string[] = [];
     for (const entry of entries) {
-      const s = await stat(resolve(dir, entry));
+      const s = await fsStat(resolve(dir, entry));
       if (s.isDirectory()) dirs.push(entry);
     }
     return dirs;
@@ -101,6 +100,14 @@ async function listSubdirectories(dir: string): Promise<string[]> {
     void _;
     return [];
   }
+}
+
+function getSymlinkDirs(targets: string[], targetDir: string): string[] {
+  const dirs: string[] = [];
+  if (targets.includes("claude-code")) {
+    dirs.push(resolve(targetDir, ".claude", "skills"));
+  }
+  return dirs;
 }
 
 export async function buildSyncPlan(
@@ -129,19 +136,14 @@ export async function buildSyncPlan(
   const converters = getAllConverters(config.targets);
   const plannedFiles: PlannedFile[] = [];
 
+  const canonicalOutputDir = resolve(targetDir, ".agents", "skills");
+  const skillOutputDirs = [canonicalOutputDir];
+
   const definedSkillNames = new Set(config.skills.map((s) => s.name));
 
-  const skillOutputDirs: string[] = [];
-  for (const converter of converters) {
-    for (const p of converter.getOutputPaths(targetDir)) {
-      if (p.endsWith("skills")) skillOutputDirs.push(p);
-    }
-  }
   const existingSkillNames = new Set<string>();
-  for (const dir of skillOutputDirs) {
-    for (const name of await listSubdirectories(dir)) {
-      existingSkillNames.add(name);
-    }
+  for (const name of await listSubdirectories(canonicalOutputDir)) {
+    existingSkillNames.add(name);
   }
 
   const plannedSkills: PlannedSkill[] = [];
@@ -155,6 +157,29 @@ export async function buildSyncPlan(
     if (!definedSkillNames.has(name)) {
       plannedSkills.push({ name, operation: "delete" });
     }
+  }
+
+  for (const skill of config.skills) {
+    const skillMdPath = resolve(canonicalOutputDir, skill.name, "SKILL.md");
+    const content = buildSkillMd(skill, config);
+    const existing = await readFileOrEmpty(skillMdPath);
+    plannedFiles.push({
+      path: skillMdPath,
+      content,
+      existing,
+      operation: !existing ? "create" : content !== existing ? "update" : "unchanged",
+    });
+  }
+
+  for (const symlinkDir of getSymlinkDirs(config.targets, targetDir)) {
+    const symlinkTarget = relative(dirname(symlinkDir), canonicalOutputDir);
+    plannedFiles.push({
+      path: symlinkDir,
+      content: "",
+      existing: "",
+      operation: "create",
+      symlink: symlinkTarget,
+    });
   }
 
   const instructionFiles: { path: string; skillsPath: string }[] = [
@@ -238,6 +263,9 @@ async function copyDirRecursive(
 
 async function copySupportingFiles(plan: SyncPlan): Promise<string[]> {
   const copied: string[] = [];
+  const canonicalOutputDir = plan.skillOutputDirs[0];
+  if (!canonicalOutputDir) return copied;
+
   const activeSkills = plan.skills
     .filter((s) => s.operation !== "delete")
     .map((s) => s.name);
@@ -251,15 +279,27 @@ async function copySupportingFiles(plan: SyncPlan): Promise<string[]> {
     }
 
     const skipFiles = new Set([`${skillName}.yaml`]);
-
-    for (const outputDir of plan.skillOutputDirs) {
-      const targetDir = resolve(outputDir, skillName);
-      const files = await copyDirRecursive(sourceDir, targetDir, skipFiles);
-      copied.push(...files);
-    }
+    const targetDir = resolve(canonicalOutputDir, skillName);
+    const files = await copyDirRecursive(sourceDir, targetDir, skipFiles);
+    copied.push(...files);
   }
 
   return copied;
+}
+
+async function ensureSymlink(linkPath: string, target: string): Promise<void> {
+  try {
+    const s = await lstat(linkPath);
+    if (s.isSymbolicLink()) {
+      await rm(linkPath);
+    } else {
+      await rm(linkPath, { recursive: true, force: true });
+    }
+  } catch {
+    // path doesn't exist
+  }
+  await mkdir(dirname(linkPath), { recursive: true });
+  await symlink(target, linkPath, "dir");
 }
 
 async function applySyncPlan(plan: SyncPlan): Promise<string[]> {
@@ -273,6 +313,13 @@ async function applySyncPlan(plan: SyncPlan): Promise<string[]> {
   const written: string[] = [];
   for (const file of plan.files) {
     if (file.operation === "delete") continue;
+
+    if (file.symlink) {
+      await ensureSymlink(file.path, file.symlink);
+      written.push(file.path);
+      continue;
+    }
+
     await mkdir(dirname(file.path), { recursive: true });
     await writeFile(file.path, file.content, "utf-8");
     written.push(file.path);

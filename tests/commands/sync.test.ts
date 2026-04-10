@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, mkdir, readFile, rm, stat } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir, readFile, rm, stat, lstat, readlink } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { stringify as toYaml } from "yaml";
@@ -118,7 +118,7 @@ describe("runSync", () => {
     await expect(stat(join(tempDir, "CLAUDE.md"))).rejects.toThrow();
   });
 
-  it("generates .agents/skills/<name>/SKILL.md for codex", async () => {
+  it("generates .agents/skills/<name>/SKILL.md as canonical output", async () => {
     await setupProject(tempDir);
     await runSync(tempDir);
 
@@ -130,7 +130,19 @@ describe("runSync", () => {
     expect(content).toContain("Help the user with coding tasks");
   });
 
-  it("generates .claude/skills/<name>/SKILL.md", async () => {
+  it("creates .claude/skills as a symlink to ../.agents/skills", async () => {
+    await setupProject(tempDir);
+    await runSync(tempDir);
+
+    const claudeSkills = join(tempDir, ".claude", "skills");
+    const s = await lstat(claudeSkills);
+    expect(s.isSymbolicLink()).toBe(true);
+
+    const target = await readlink(claudeSkills);
+    expect(target).toBe(join("..", ".agents", "skills"));
+  });
+
+  it("makes .claude/skills/<name>/SKILL.md readable through the symlink", async () => {
     await setupProject(tempDir);
     await runSync(tempDir);
 
@@ -140,6 +152,31 @@ describe("runSync", () => {
     );
     expect(content).toContain("name: helper");
     expect(content).toContain("Help the user with coding tasks");
+  });
+
+  it("does not create .claude/skills symlink when claude-code is not a target", async () => {
+    await setupProject(tempDir);
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        targets: ["codex", "cursor"],
+        skills: [{ path: ".agsync/skills/*" }],
+        tools: [{ path: ".agsync/tools/*.yaml" }],
+      })
+    );
+    await runSync(tempDir);
+
+    await expect(lstat(join(tempDir, ".claude", "skills"))).rejects.toThrow();
+  });
+
+  it("re-creates symlink on re-sync", async () => {
+    await setupProject(tempDir);
+    await runSync(tempDir);
+    await runSync(tempDir);
+
+    const s = await lstat(join(tempDir, ".claude", "skills"));
+    expect(s.isSymbolicLink()).toBe(true);
   });
 
   it("generates .claude/settings.json with MCP config", async () => {
