@@ -83,6 +83,7 @@ export interface SyncPlan {
   skills: PlannedSkill[];
   files: PlannedFile[];
   skillOutputDirs: string[];
+  canonicalSkillsDir: string;
   warnings: string[];
 }
 

@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdir, writeFile, readFile, rm, readdir, stat as fsStat, copyFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { loadHierarchicalConfig } from "@/loader/hierarchy";
 import { resolveAllSkills } from "@/resolver/skills";
@@ -199,7 +199,67 @@ export async function buildSyncPlan(
     }
   }
 
-  return { skills: plannedSkills, files: plannedFiles, skillOutputDirs, warnings };
+  return { skills: plannedSkills, files: plannedFiles, skillOutputDirs, canonicalSkillsDir: skillsDir, warnings };
+}
+
+async function copyDirRecursive(
+  srcDir: string,
+  destDir: string,
+  skipFiles: Set<string>
+): Promise<string[]> {
+  const copied: string[] = [];
+  let entries: string[];
+  try {
+    entries = await readdir(srcDir);
+  } catch {
+    return copied;
+  }
+
+  for (const entry of entries) {
+    if (skipFiles.has(entry)) continue;
+
+    const srcPath = resolve(srcDir, entry);
+    const destPath = resolve(destDir, entry);
+    const s = await fsStat(srcPath);
+
+    if (s.isDirectory()) {
+      await mkdir(destPath, { recursive: true });
+      const nested = await copyDirRecursive(srcPath, destPath, new Set());
+      copied.push(...nested);
+    } else if (s.isFile()) {
+      await mkdir(dirname(destPath), { recursive: true });
+      await copyFile(srcPath, destPath);
+      copied.push(destPath);
+    }
+  }
+
+  return copied;
+}
+
+async function copySupportingFiles(plan: SyncPlan): Promise<string[]> {
+  const copied: string[] = [];
+  const activeSkills = plan.skills
+    .filter((s) => s.operation !== "delete")
+    .map((s) => s.name);
+
+  for (const skillName of activeSkills) {
+    const sourceDir = resolve(plan.canonicalSkillsDir, skillName);
+    try {
+      await fsStat(sourceDir);
+    } catch {
+      continue;
+    }
+
+    const skipFiles = new Set([`${skillName}.yaml`]);
+
+    for (const outputDir of plan.skillOutputDirs) {
+      const targetDir = resolve(outputDir, skillName);
+      const files = await copyDirRecursive(sourceDir, targetDir, skipFiles);
+      copied.push(...files);
+    }
+  }
+
+  return copied;
 }
 
 async function applySyncPlan(plan: SyncPlan): Promise<string[]> {
@@ -217,6 +277,9 @@ async function applySyncPlan(plan: SyncPlan): Promise<string[]> {
     await writeFile(file.path, file.content, "utf-8");
     written.push(file.path);
   }
+
+  const copied = await copySupportingFiles(plan);
+  written.push(...copied);
 
   return written;
 }

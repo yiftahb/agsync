@@ -192,6 +192,7 @@ describe("formatPlan", () => {
       ],
       files: [],
       skillOutputDirs: [],
+      canonicalSkillsDir: "/project/.agsync/skills",
       warnings: [],
     };
     const output = formatPlan(plan, "/project");
@@ -209,6 +210,7 @@ describe("formatPlan", () => {
         { path: "/project/AGENTS.md", content: "x", existing: "", operation: "create" as const },
       ],
       skillOutputDirs: [],
+      canonicalSkillsDir: "/project/.agsync/skills",
       warnings: [],
     };
     const output = formatPlan(plan, "/project");
@@ -219,7 +221,7 @@ describe("formatPlan", () => {
   });
 
   it("reports no changes when plan is empty", () => {
-    const output = formatPlan({ skills: [], files: [], skillOutputDirs: [], warnings: [] }, "/project");
+    const output = formatPlan({ skills: [], files: [], skillOutputDirs: [], canonicalSkillsDir: "/project/.agsync/skills", warnings: [] }, "/project");
     expect(output).toContain("No changes needed");
   });
 });
