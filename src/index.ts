@@ -7,13 +7,16 @@ import { runDoctor } from "@/commands/doctor";
 import { getExtendedHelp } from "@/commands/help";
 import { runAdd } from "@/commands/add";
 import { runRemove } from "@/commands/remove";
+import { runUpdate } from "@/commands/update";
+
+declare const __VERSION__: string;
 
 const program = new Command();
 
 program
   .name("agsync")
   .description("Git-native CLI to sync skills and MCP tools across AI coding clients")
-  .version("0.1.0");
+  .version(__VERSION__);
 
 program
   .command("init")
@@ -144,6 +147,18 @@ skill
     try {
       const removed = await runRemove(opts.dir, skillName);
       console.log(`Removed skill "${skillName}" from ${removed}`);
+    } catch (err: unknown) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("update")
+  .description("Update agsync to the latest version")
+  .action(async () => {
+    try {
+      await runUpdate();
     } catch (err: unknown) {
       console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);

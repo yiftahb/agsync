@@ -24,13 +24,13 @@ Define your AI agent skills and tool configurations once in `.agsync/`, then gen
 ## Install
 
 ```bash
-npm i -g agsync
+npm i -g agsync-cli
 ```
 
 Or run directly:
 
 ```bash
-npx agsync
+npx agsync-cli
 ```
 
 ## Quick Start

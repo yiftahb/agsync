@@ -1,5 +1,5 @@
 {
-  "name": "agsync",
+  "name": "agsync-cli",
   "version": "0.1.4",
   "description": "Git-native CLI to sync skills, MCP tools, and policies across AI coding clients",
   "type": "module",
