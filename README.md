@@ -6,6 +6,12 @@
   Git-native CLI to sync skills and MCP tools across Claude Code, Codex, and Cursor.
 </p>
 
+<p align="center">
+  <a href="https://github.com/yiftahb/agsync/actions/workflows/ci.yml"><img src="https://github.com/yiftahb/agsync/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.npmjs.com/package/agsync-cli"><img src="https://img.shields.io/npm/v/agsync-cli" alt="npm version"></a>
+  <a href="https://github.com/yiftahb/agsync/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/agsync-cli" alt="license"></a>
+</p>
+
 Define your AI agent skills and tool configurations once in `.agsync/`, then generate client-specific output for every coding agent your team uses.
 
 ## Supported Agents
