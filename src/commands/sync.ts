@@ -1,8 +1,8 @@
 import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
-import { resolve, dirname, relative } from "node:path";
+import { resolve, dirname } from "node:path";
 import { loadHierarchicalConfig } from "@/loader/hierarchy";
 import { resolveAllSkills } from "@/resolver/skills";
-import { getAllConverters, BaseAgentConverter } from "@/converters";
+import { getAllConverters } from "@/converters";
 import { runValidate } from "@/commands/validate";
 import { expandToolEnv } from "@/utils/env";
 import type { ResolvedConfig, LoadedConfig, SyncPlan, PlannedFile, PlannedSkill } from "@/types";
