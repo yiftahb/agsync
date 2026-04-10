@@ -18,9 +18,9 @@ Define your AI agent skills and tool configurations once in `.agsync/`, then gen
 
 | Agent | Status |
 |-------|--------|
-| Claude Code | Supported |
-| Cursor | Supported |
-| Codex | Supported |
+| Claude Code | ✅ |
+| Cursor | ✅ |
+| Codex | ✅ |
 | OpenCode | Coming Soon |
 | Windsurf | Coming Soon |
 | Cline | Coming Soon |
