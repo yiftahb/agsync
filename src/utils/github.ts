@@ -147,7 +147,14 @@ async function downloadDirectoryRecursive(
   return downloaded;
 }
 
-export function parseSkillMd(raw: string): { name: string; description: string; instructions: string } {
+export function parseSkillMd(raw: string): {
+  name: string;
+  description: string;
+  instructions: string;
+  extends?: string[];
+  tools?: string[];
+  source?: { registry: string; org: string; repo: string; path: string; ref?: string };
+} {
   const frontmatterMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!frontmatterMatch) {
     throw new Error("SKILL.md must have YAML frontmatter delimited by ---");
@@ -160,5 +167,8 @@ export function parseSkillMd(raw: string): { name: string; description: string; 
     name: frontmatter.name,
     description: frontmatter.description.trim(),
     instructions: body,
+    extends: frontmatter.extends,
+    tools: frontmatter.tools,
+    source: frontmatter.source,
   };
 }

@@ -1,45 +1,47 @@
 # Extending Skills
 
-There are two ways to extend skills: via `source` with local `instructions`, or via the `extends` field.
+There are two ways to extend skills: via `source` with local instructions, or via the `extends` field.
 
-## Extending an Imported Skill (source + instructions)
+## Extending an Imported Skill (source + local instructions)
 
-Add `instructions` to a sourced skill. Your instructions are appended after the remote skill's instructions:
+Add instructions below the frontmatter to extend a sourced skill. Your instructions are appended after the remote skill's instructions:
 
-```yaml
-# .agsync/skills/code-reviewer/code-reviewer.yaml
+```markdown
+<!-- .agsync/skills/code-reviewer/SKILL.md -->
+---
 name: code-reviewer
-description: >
-  Security-focused code reviewer for our team.
+description: Security-focused code reviewer for our team.
 source:
   registry: github
   org: Shubhamsaboo
   repo: awesome-llm-apps
   path: awesome_agent_skills/code-reviewer
-instructions: |
-  Additionally, focus on OWASP Top 10 vulnerabilities.
-  Flag any hardcoded secrets or credentials.
 tools:
   - github
+---
+
+Additionally, focus on OWASP Top 10 vulnerabilities.
+Flag any hardcoded secrets or credentials.
 ```
 
-- **No `instructions`**: pure import, everything comes from the source
-- **With `instructions`**: extension, your content is appended after the remote content
+- **No body**: pure import, everything comes from the source
+- **With body**: extension, your content is appended after the remote content
 
 ## Extending via `extends` (local and remote inheritance)
 
-Skills can inherit from other skills using the `extends` field:
+Skills can inherit from other skills using the `extends` frontmatter field:
 
-```yaml
-# .agsync/skills/security-reviewer/security-reviewer.yaml
+```markdown
+<!-- .agsync/skills/security-reviewer/SKILL.md -->
+---
 name: security-reviewer
-description: >
-  Security-focused code reviewer. Use for security audits.
+description: Security-focused code reviewer. Use for security audits.
 extends:
-  - ./code-reviewer                        # Local skill in .agsync/skills/
-  - github:your-org/shared-skills/owasp    # Fetched from GitHub, cached locally
-instructions: |
-  Focus specifically on OWASP Top 10 vulnerabilities.
+  - ./code-reviewer
+  - github:your-org/shared-skills/owasp
+---
+
+Focus specifically on OWASP Top 10 vulnerabilities.
 ```
 
 ### Merge Strategy

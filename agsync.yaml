@@ -1,10 +1,116 @@
 version: "1"
-targets:
-  - claude-code
-  - codex
-  - cursor
-  - windsurf
+
+# ── Global feature togglers ─────────────────────────────────
+# Master switches — if false, the feature is off for ALL agents.
+# All default to false. Enable only what you need.
+features:
+  instructions: true
+  skills: true
+  commands: true
+  mcp: true
+
+# ── Content sources ──────────────────────────────────────────
 skills:
   - path: .agsync/skills/*
+
+commands:
+  - path: .agsync/commands/*
+
 tools:
   - path: .agsync/tools/*.yaml
+
+# ── Gitignore management ────────────────────────────────────
+# "on"      — add all generated output to .gitignore
+# "mcpOnly" — only add MCP config files (default)
+# "off"     — don't touch .gitignore
+gitignore: mcpOnly
+
+# ── Agent configuration ──────────────────────────────────────
+# Enable features per agent. Unlisted agents stay off entirely.
+# Each feature supports:
+#   enabled:        bool   — turn the feature on/off
+#   destination:    string — override the default output path (optional)
+#   merge_strategy: "merge" | "override" — MCP only (optional)
+agents:
+
+  # ── Cursor (active) ────────────────────────────────────────
+  cursor:
+    skills:
+      enabled: true
+    commands:
+      enabled: true
+    mcp:
+      enabled: true
+
+  # ── Claude Code ────────────────────────────────────────────
+  # claude:
+  #   instructions:
+  #     enabled: true
+  #     # destination: CLAUDE.md                   # default
+  #   skills:
+  #     enabled: true
+  #     # destination: .claude/skills              # default
+  #   commands:
+  #     enabled: true
+  #     # destination: .claude/commands            # default
+  #   mcp:
+  #     enabled: true
+  #     # destination: .claude/settings.json       # default
+  #     # merge_strategy: merge                    # default
+
+  # ── Codex ──────────────────────────────────────────────────
+  # codex:
+  #   instructions:
+  #     enabled: true
+  #     # destination: .codex/instructions.md      # default
+  #   skills:
+  #     enabled: true
+  #   commands:
+  #     enabled: true
+  #   mcp:
+  #     enabled: true
+  #     # destination: .codex/config.toml          # default (TOML)
+
+  # ── Windsurf ───────────────────────────────────────────────
+  # windsurf:
+  #   skills:
+  #     enabled: true
+  #   mcp:
+  #     enabled: true
+
+  # ── GitHub Copilot ─────────────────────────────────────────
+  # copilot:
+  #   instructions:
+  #     enabled: true
+  #     # destination: .github/copilot-instructions.md
+  #   commands:
+  #     enabled: true
+  #     # destination: .github/agents
+  #   mcp:
+  #     enabled: true
+  #     # destination: .mcp.json
+
+  # ── Google Gemini ──────────────────────────────────────────
+  # gemini:
+  #   instructions:
+  #     enabled: true
+  #   skills:
+  #     enabled: true
+  #   mcp:
+  #     enabled: true
+
+  # ── OpenCode ───────────────────────────────────────────────
+  # opencode:
+  #   skills:
+  #     enabled: true
+  #   mcp:
+  #     enabled: true
+
+  # ── Antigravity ────────────────────────────────────────────
+  # antigravity:
+  #   instructions:
+  #     enabled: true
+  #   skills:
+  #     enabled: true
+  #   commands:
+  #     enabled: true

@@ -3,8 +3,26 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { stringify as toYaml } from "yaml";
 import { runValidate } from "@/commands/validate";
+import { loadHierarchicalConfig } from "@/loader/hierarchy";
 
 let tempDir: string;
+
+function skillMd(frontmatter: Record<string, unknown>, body: string): string {
+  return `---\n${toYaml(frontmatter).trim()}\n---\n\n${body}\n`;
+}
+
+function baseConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    version: "1",
+    agents: {
+      codex: { skills: { enabled: true }, mcp: { enabled: true } },
+    },
+    skills: [{ path: ".agsync/skills/*" }],
+    commands: [{ path: ".agsync/commands/*.md" }],
+    tools: [{ path: ".agsync/tools/*.yaml" }],
+    ...overrides,
+  };
+}
 
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), "agsync-validate-"));
@@ -26,16 +44,9 @@ describe("runValidate", () => {
     const skillDir = join(tempDir, ".agsync", "skills", "test");
     await mkdir(skillDir, { recursive: true });
     await mkdir(join(tempDir, ".agsync", "tools"), { recursive: true });
+    await mkdir(join(tempDir, ".agsync", "commands"), { recursive: true });
 
-    await writeFile(
-      join(tempDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        targets: ["codex"],
-        skills: [{ path: ".agsync/skills/*" }],
-        tools: [{ path: ".agsync/tools/*.yaml" }],
-      })
-    );
+    await writeFile(join(tempDir, "agsync.yaml"), toYaml(baseConfig()));
 
     await writeFile(
       join(tempDir, ".agsync", "tools", "grep.yaml"),
@@ -43,9 +54,14 @@ describe("runValidate", () => {
     );
 
     await writeFile(
-      join(skillDir, "test.yaml"),
-      toYaml({ name: "test", description: "Test", instructions: "Test", tools: ["grep"] })
+      join(skillDir, "SKILL.md"),
+      skillMd(
+        { name: "test", description: "Test", tools: ["grep"] },
+        "Test instructions"
+      )
     );
+
+    await writeFile(join(tempDir, ".agsync", "commands", "lint.md"), "# lint\n", "utf-8");
 
     const errors = await runValidate(tempDir);
     expect(errors).toHaveLength(0);
@@ -57,12 +73,15 @@ describe("runValidate", () => {
 
     await writeFile(
       join(tempDir, "agsync.yaml"),
-      toYaml({ version: "1", targets: ["codex"], skills: [{ path: ".agsync/skills/*" }] })
+      toYaml(baseConfig({ commands: [] }))
     );
 
     await writeFile(
-      join(skillDir, "test.yaml"),
-      toYaml({ name: "test", description: "Test", instructions: "Test", tools: ["nonexistent"] })
+      join(skillDir, "SKILL.md"),
+      skillMd(
+        { name: "test", description: "Test", tools: ["nonexistent"] },
+        "Test instructions"
+      )
     );
 
     const errors = await runValidate(tempDir);
@@ -75,12 +94,7 @@ describe("runValidate", () => {
 
     await writeFile(
       join(tempDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        targets: ["codex"],
-        skills: [],
-        tools: [{ path: ".agsync/tools/*.yaml" }],
-      })
+      toYaml(baseConfig({ skills: [], commands: [] }))
     );
 
     await writeFile(
@@ -108,12 +122,7 @@ describe("runValidate", () => {
 
       await writeFile(
         join(tempDir, "agsync.yaml"),
-        toYaml({
-          version: "1",
-          targets: ["codex"],
-          skills: [],
-          tools: [{ path: ".agsync/tools/*.yaml" }],
-        })
+        toYaml(baseConfig({ skills: [], commands: [] }))
       );
 
       await writeFile(
@@ -143,19 +152,58 @@ describe("runValidate", () => {
 
     await writeFile(
       join(tempDir, "agsync.yaml"),
-      toYaml({ version: "1", targets: ["codex"], skills: [{ path: ".agsync/skills/*" }] })
+      toYaml(baseConfig({ commands: [] }))
     );
 
     await writeFile(
-      join(skillDirA, "a.yaml"),
-      toYaml({ name: "dupe", description: "A", instructions: "A" })
+      join(skillDirA, "SKILL.md"),
+      skillMd({ name: "dupe", description: "A" }, "A")
     );
     await writeFile(
-      join(skillDirB, "b.yaml"),
-      toYaml({ name: "dupe", description: "B", instructions: "B" })
+      join(skillDirB, "SKILL.md"),
+      skillMd({ name: "dupe", description: "B" }, "B")
     );
 
     const errors = await runValidate(tempDir);
     expect(errors.some((e) => e.message.includes("Duplicate"))).toBe(true);
+  });
+
+  it("warns when a command file is empty", async () => {
+    await mkdir(join(tempDir, ".agsync", "commands"), { recursive: true });
+    await mkdir(join(tempDir, ".agsync", "skills", "only"), { recursive: true });
+
+    await writeFile(join(tempDir, "agsync.yaml"), toYaml(baseConfig()));
+
+    await writeFile(
+      join(tempDir, ".agsync", "skills", "only", "SKILL.md"),
+      skillMd({ name: "only", description: "Only skill" }, "Body")
+    );
+
+    await writeFile(join(tempDir, ".agsync", "commands", "empty.md"), "", "utf-8");
+
+    const errors = await runValidate(tempDir);
+    const emptyCmd = errors.find(
+      (e) => e.severity === "warn" && e.message.includes("Command file is empty")
+    );
+    expect(emptyCmd).toBeDefined();
+    expect(emptyCmd!.file).toContain("command: empty");
+  });
+
+  it("exposes commands on LoadedConfig from hierarchy loader", async () => {
+    await mkdir(join(tempDir, ".agsync", "commands"), { recursive: true });
+    await mkdir(join(tempDir, ".agsync", "skills", "s"), { recursive: true });
+
+    await writeFile(join(tempDir, "agsync.yaml"), toYaml(baseConfig()));
+
+    await writeFile(
+      join(tempDir, ".agsync", "skills", "s", "SKILL.md"),
+      skillMd({ name: "s", description: "S" }, "Hi")
+    );
+    await writeFile(join(tempDir, ".agsync", "commands", "x.md"), "# x\n", "utf-8");
+
+    const loaded = await loadHierarchicalConfig(tempDir);
+    expect(loaded).not.toBeNull();
+    expect(Array.isArray(loaded!.commands)).toBe(true);
+    expect(loaded!.commands.map((c) => c.name)).toContain("x");
   });
 });

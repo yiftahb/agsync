@@ -48,6 +48,23 @@ function validateUniqueNames(loaded: LoadedConfig): ValidationError[] {
 
   checkDuplicates(loaded.skills, "skill");
   checkDuplicates(loaded.tools, "tool");
+  checkDuplicates(loaded.commands, "command");
+
+  return errors;
+}
+
+function validateCommands(loaded: LoadedConfig): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  for (const cmd of loaded.commands) {
+    if (!cmd.content.trim()) {
+      errors.push({
+        file: `command: ${cmd.name}`,
+        message: "Command file is empty",
+        severity: "warn",
+      });
+    }
+  }
 
   return errors;
 }
@@ -80,6 +97,7 @@ export async function runValidate(targetDir: string): Promise<ValidationError[]>
   errors.push(...validateUniqueNames(loaded));
   errors.push(...validateSkillCompleteness(loaded));
   errors.push(...validateCrossReferences(loaded));
+  errors.push(...validateCommands(loaded));
   errors.push(...validateEnvReferences(loaded));
 
   return errors;

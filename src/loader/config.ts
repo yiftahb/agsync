@@ -4,13 +4,14 @@ import { glob } from "glob";
 import { parse as parseYaml } from "yaml";
 import {
   agsyncConfigSchema,
-  skillDefinitionSchema,
   toolDefinitionSchema,
 } from "@/schema/config";
+import { parseSkillMd } from "@/utils/github";
 import type {
   AgsyncConfig,
   LoadedConfig,
   SkillDefinition,
+  CommandDefinition,
   ToolDefinition,
 } from "@/types";
 
@@ -51,19 +52,52 @@ async function loadSkillEntries(
 
     for (const match of matches.sort()) {
       if (await isDirectory(match)) {
-        const dirName = basename(match);
-        const yamlPath = resolve(match, `${dirName}.yaml`);
+        const skillMdPath = resolve(match, "SKILL.md");
         try {
-          const raw = await readFile(yamlPath, "utf-8");
-          const parsed = parseYaml(raw);
-          results.push(skillDefinitionSchema.parse(parsed));
-        } catch (_) {
-          void _;
+          const raw = await readFile(skillMdPath, "utf-8");
+          const parsed = parseSkillMd(raw);
+          results.push({
+            name: parsed.name,
+            description: parsed.description,
+            instructions: parsed.instructions || undefined,
+            extends: parsed.extends,
+            tools: parsed.tools,
+            source: parsed.source,
+          });
+        } catch {
+          const dirName = basename(match);
+          const yamlPath = resolve(match, `${dirName}.yaml`);
+          try {
+            const raw = await readFile(yamlPath, "utf-8");
+            const parsed = parseYaml(raw);
+            const { skillDefinitionSchema } = await import("@/schema/config");
+            results.push(skillDefinitionSchema.parse(parsed));
+          } catch (_) {
+            void _;
+          }
         }
-      } else if (match.endsWith(".yaml") || match.endsWith(".yml")) {
+      }
+    }
+  }
+
+  return results;
+}
+
+async function loadCommandEntries(
+  baseDir: string,
+  patterns: { path: string }[]
+): Promise<CommandDefinition[]> {
+  const results: CommandDefinition[] = [];
+
+  for (const pattern of patterns) {
+    const fullPattern = resolve(baseDir, pattern.path);
+    const matches = await glob(fullPattern);
+
+    for (const match of matches.sort()) {
+      if (match.endsWith(".md")) {
         const raw = await readFile(match, "utf-8");
-        const parsed = parseYaml(raw);
-        results.push(skillDefinitionSchema.parse(parsed));
+        const name = basename(match, ".md");
+        results.push({ name, content: raw });
       }
     }
   }
@@ -95,11 +129,13 @@ export async function loadFullConfig(configPath: string): Promise<LoadedConfig> 
 
   const skills = await loadSkillEntries(baseDir, config.skills);
 
+  const commands = await loadCommandEntries(baseDir, config.commands);
+
   const tools = await loadYamlFiles<ToolDefinition>(
     baseDir,
     config.tools,
     (data) => toolDefinitionSchema.parse(data)
   );
 
-  return { config, skills, tools, configPath };
+  return { config, skills, commands, tools, configPath };
 }

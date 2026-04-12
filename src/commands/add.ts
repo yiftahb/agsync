@@ -10,6 +10,15 @@ import {
 } from "@/utils/github";
 import type { SkillSource } from "@/types";
 
+function buildSkillMd(frontmatter: Record<string, unknown>, body?: string): string {
+  const yaml = toYaml(frontmatter).trim();
+  const parts = [`---`, yaml, `---`];
+  if (body) {
+    parts.push("", body);
+  }
+  return parts.join("\n") + "\n";
+}
+
 export async function runAdd(
   targetDir: string,
   repoRef: string,
@@ -51,14 +60,14 @@ export async function runAdd(
     description = parsed.description;
   }
 
-  const skillDef: Record<string, unknown> = {
+  const frontmatter: Record<string, unknown> = {
     name,
     description,
     source,
   };
 
-  const yamlPath = resolve(localSkillDir, `${skillName}.yaml`);
-  await writeFile(yamlPath, toYaml(skillDef), "utf-8");
+  const skillMdPath = resolve(localSkillDir, "SKILL.md");
+  await writeFile(skillMdPath, buildSkillMd(frontmatter), "utf-8");
 
-  return [yamlPath];
+  return [skillMdPath];
 }

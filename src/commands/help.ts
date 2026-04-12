@@ -1,22 +1,22 @@
 export function getExtendedHelp(): string {
   return `
-agsync - Git-native CLI to sync skills and MCP tools across AI coding clients
+agsync - Git-native CLI to sync skills, commands, and MCP tools across AI coding agents
 
 USAGE
   agsync <command> [options]
 
 GETTING STARTED
-  agsync init                             Scaffold a new project with agsync.yaml and sample skill
+  agsync init                             Scaffold a new project with agsync.yaml
   agsync validate                         Validate config and all definitions
   agsync plan                             Preview changes without writing files
-  agsync sync                             Generate client configs for all targets
+  agsync sync                             Generate output for all enabled agents
 
 MANAGING SKILLS
-  agsync skill add <org/repo> <name>      Register a skill from a GitHub repository
+  agsync skill add <org/repo> <name>      Import a skill from a GitHub repository
   agsync skill remove <name>              Remove a skill from .agsync/skills/
 
 MAINTENANCE
-  agsync doctor                           Check environment health and client CLIs
+  agsync doctor                           Check environment health and enabled agents
   agsync version                          Show current version and check for updates
   agsync update                           Update agsync to the latest version
   agsync help                             Show this help message
@@ -25,22 +25,19 @@ COMMON WORKFLOWS
 
   Set up a new project:
     agsync init
-    # Edit .agsync/skills/ and .agsync/tools/ as needed
+    # Edit .agsync/skills/, .agsync/commands/, .agsync/tools/
     agsync sync
 
   Import a skill from GitHub:
     agsync skill add Shubhamsaboo/awesome-llm-apps code-reviewer
-    # This creates a stub YAML with the source reference
-    # Running sync fetches the remote content and generates output
+    # Creates a SKILL.md stub with a source reference
     agsync sync
 
-  Extend an imported skill with custom instructions:
-    agsync skill add Shubhamsaboo/awesome-llm-apps code-reviewer
-    # Add "instructions:" to the generated YAML to extend the skill
-    # Your instructions are appended after the remote skill's instructions
+  Add a command (slash command):
+    # Create .agsync/commands/deploy.md with the command instructions
     agsync sync
 
-  Add an MCP server (e.g. GitHub):
+  Add an MCP server:
     # Create .agsync/tools/github.yaml:
     #   name: github
     #   type: mcp
@@ -51,26 +48,25 @@ COMMON WORKFLOWS
     export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxx
     agsync sync
 
-  Check what sync will do before applying:
-    agsync validate && agsync plan
-
 SKILL FORMAT
-  Each skill is a directory under .agsync/skills/ containing a YAML file
-  matching the directory name:
+  Each skill is a directory under .agsync/skills/ with a SKILL.md file:
 
     .agsync/skills/my-skill/
-    ├── my-skill.yaml      Required: skill definition
-    ├── scripts/           Optional: executable code
-    ├── references/        Optional: documentation loaded on demand
-    └── assets/            Optional: templates, images, data files
+    ├── SKILL.md            Required: frontmatter + instructions
+    ├── scripts/            Optional: executable code
+    ├── references/         Optional: documentation
+    └── assets/             Optional: templates, data files
 
-  Local skill (with instructions):
+  SKILL.md format:
+    ---
     name: my-skill
     description: What this skill does and when to use it
-    instructions: |
-      Detailed instructions for the agent.
+    ---
 
-  Imported skill (source only, content fetched during sync):
+    Detailed instructions for the agent.
+
+  Imported skill (stub with source):
+    ---
     name: my-skill
     description: What this skill does
     source:
@@ -78,22 +74,15 @@ SKILL FORMAT
       org: org-name
       repo: repo-name
       path: path/to/skill
+    ---
 
-  Extended imported skill (source + local instructions appended):
-    name: my-skill
-    description: What this skill does
-    source:
-      registry: github
-      org: org-name
-      repo: repo-name
-      path: path/to/skill
-    instructions: |
-      Additional instructions appended to the remote skill.
+COMMAND FORMAT
+  Commands are .md files under .agsync/commands/:
 
-  Skills can also inherit via extends:
-    extends:
-      - ./base-skill                       Local skill
-      - github:org/repo/path               Fetched from GitHub
+    .agsync/commands/deploy.md     → /deploy slash command
+    .agsync/commands/review.md     → /review slash command
+
+  Each file contains the command instructions in markdown.
 
 TOOL FORMAT
   Define MCP servers in .agsync/tools/*.yaml:
@@ -106,17 +95,63 @@ TOOL FORMAT
     env:
       GITHUB_PERSONAL_ACCESS_TOKEN: $GITHUB_PERSONAL_ACCESS_TOKEN
 
-  Env values support $VAR and \${VAR} syntax, expanded from the shell at
-  sync time. Unset variables cause sync to fail; validate warns without failing.
+CONFIG FORMAT
+  agsync.yaml defines content sources and agent features:
+
+    version: "1"
+    features:
+      instructions: true
+      skills: true
+      commands: true
+      mcp: true
+    gitignore: mcpOnly
+    skills:
+      - path: .agsync/skills/*
+    commands:
+      - path: .agsync/commands/*
+    tools:
+      - path: .agsync/tools/*.yaml
+    agents:
+      claude:
+        instructions: { enabled: true }
+        skills: { enabled: true }
+        mcp: { enabled: true }
+      cursor:
+        skills: { enabled: true }
+        mcp: { enabled: true }
+
+GLOBAL FEATURES
+  The features: block is a set of master switches (default: all false).
+  If a feature is globally false, it is disabled for ALL agents regardless
+  of per-agent configuration.
+
+    features:
+      instructions: false    # Controls AGENTS.md + instruction symlinks
+      skills: false          # Controls .agents/skills/ + skill symlinks
+      commands: false        # Controls .agents/commands/ + command symlinks
+      mcp: false             # Controls MCP config generation
+
+GITIGNORE MANAGEMENT
+  The gitignore: option controls how agsync manages .gitignore entries.
+  Entries are placed in a managed section between # agsync:begin / # agsync:end.
+
+    on        Add ALL generated output (.agents/, AGENTS.md, symlinks, MCP configs)
+    mcpOnly   Add only MCP config file paths (default)
+    off       Do not manage .gitignore at all
 
 GENERATED OUTPUT
-  AGENTS.md                         Skill listing injected between agsync markers
-  CLAUDE.md                         Skill listing injected (when claude-code is a target)
-  .agents/skills/*/SKILL.md         Canonical skill output (Agent Skills standard)
-  .claude/skills/                   Symlink to .agents/skills/ (Claude Code)
-  .claude/settings.json             MCP config for Claude Code
-  .cursor/mcp.json                  MCP config for Cursor
-  .windsurf/skills/                 Symlink to .agents/skills/ (Windsurf)
-  .windsurf/mcp_config.json         MCP config for Windsurf
+  AGENTS.md                         Generated instructions + skill listing
+  .agents/skills/*/SKILL.md         Canonical skill output
+  .agents/commands/*.md             Canonical command output
+  CLAUDE.md                         Symlink → AGENTS.md
+  GEMINI.md                         Symlink → AGENTS.md
+  .claude/skills/                   Symlink → .agents/skills/
+  .cursor/skills/                   Symlink → .agents/skills/
+  .claude/settings.json             Generated MCP config
+  .cursor/mcp.json                  Generated MCP config
+  .codex/config.toml                Generated MCP config (TOML)
+
+SUPPORTED AGENTS
+  claude, cursor, codex, windsurf, copilot, gemini, opencode, antigravity
 `.trim();
 }

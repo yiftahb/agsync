@@ -1,9 +1,9 @@
-<!-- managed by agsync — do not edit directly -->
-<!-- edit sources in .agsync/ and run: agsync sync -->
-
 ---
 name: agsync
-description: Expert in agsync, the Git-native CLI that syncs skills, commands, and MCP tools across AI coding agents. Use when working with agsync.yaml, adding or removing skills, syncing configs, or troubleshooting agsync workflows.
+description: >
+  Expert in agsync, the Git-native CLI that syncs skills, commands, and MCP tools
+  across AI coding agents. Use when working with agsync.yaml, adding or removing
+  skills, syncing configs, or troubleshooting agsync workflows.
 ---
 
 # agsync

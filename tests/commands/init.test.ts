@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, access, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { parse as parseYaml } from "yaml";
 import { runInit } from "@/commands/init";
 
 let tempDir: string;
@@ -19,17 +20,53 @@ describe("runInit", () => {
 
     expect(created).toContain("agsync.yaml");
     expect(created).toContain(".agsync/skills/");
+    expect(created).toContain(".agsync/commands/");
     expect(created).toContain(".agsync/tools/");
   });
 
-  it("creates a sample skill in directory format", async () => {
-    await runInit(tempDir);
+  it("creates default skill as SKILL.md (not YAML)", async () => {
+    const created = await runInit(tempDir);
+
+    expect(created).toContain(".agsync/skills/default/SKILL.md");
 
     const skillContent = await readFile(
-      join(tempDir, ".agsync", "skills", "default", "default.yaml"),
+      join(tempDir, ".agsync", "skills", "default", "SKILL.md"),
       "utf-8"
     );
     expect(skillContent).toContain("name: default");
+    expect(skillContent).toContain("description:");
+  });
+
+  it("creates .agsync/instructions.md", async () => {
+    const created = await runInit(tempDir);
+
+    expect(created).toContain(".agsync/instructions.md");
+    const instructions = await readFile(
+      join(tempDir, ".agsync", "instructions.md"),
+      "utf-8"
+    );
+    expect(instructions).toContain("agsync");
+  });
+
+  it("writes agsync.yaml with agents block, features, and gitignore", async () => {
+    await runInit(tempDir);
+
+    const raw = await readFile(join(tempDir, "agsync.yaml"), "utf-8");
+    const cfg = parseYaml(raw) as Record<string, unknown>;
+
+    expect(cfg.agents).toBeDefined();
+    expect(cfg.targets).toBeUndefined();
+    expect((cfg.agents as Record<string, unknown>).claude).toMatchObject({
+      instructions: { enabled: true },
+      skills: { enabled: true },
+    });
+    expect(cfg.features).toEqual({
+      instructions: true,
+      skills: true,
+      commands: true,
+      mcp: true,
+    });
+    expect(cfg.gitignore).toBe("mcpOnly");
   });
 
   it("throws if agsync.yaml already exists", async () => {
@@ -40,7 +77,7 @@ describe("runInit", () => {
   it("creates required directories under .agsync", async () => {
     await runInit(tempDir);
 
-    for (const dir of ["skills", "tools"]) {
+    for (const dir of ["skills", "commands", "tools"]) {
       await expect(access(join(tempDir, ".agsync", dir))).resolves.toBeUndefined();
     }
   });

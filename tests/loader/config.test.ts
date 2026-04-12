@@ -14,9 +14,26 @@ afterEach(async () => {
   await rm(tempDir, { recursive: true, force: true });
 });
 
+function agsyncYaml(extra: Record<string, unknown> = {}): string {
+  return toYaml({
+    version: "1",
+    agents: {
+      codex: { instructions: { enabled: true } },
+    },
+    skills: [],
+    commands: [],
+    tools: [],
+    ...extra,
+  });
+}
+
+function skillMd(frontmatter: Record<string, unknown>, body: string): string {
+  return `---\n${toYaml(frontmatter).trim()}\n---\n\n${body.trim()}\n`;
+}
+
 describe("findConfigFile", () => {
   it("returns path when agsync.yaml exists", async () => {
-    await writeFile(join(tempDir, "agsync.yaml"), "version: '1'\ntargets: [codex]");
+    await writeFile(join(tempDir, "agsync.yaml"), agsyncYaml());
     const result = await findConfigFile(tempDir);
     expect(result).toBe(join(tempDir, "agsync.yaml"));
   });
@@ -28,83 +45,145 @@ describe("findConfigFile", () => {
 });
 
 describe("loadConfigFile", () => {
-  it("parses a valid agsync.yaml", async () => {
-    const config = { version: "1", targets: ["claude-code", "cursor"] };
+  it("parses a valid agsync.yaml with agents", async () => {
     const configPath = join(tempDir, "agsync.yaml");
-    await writeFile(configPath, toYaml(config));
+    await writeFile(
+      configPath,
+      toYaml({
+        version: "1",
+        agents: {
+          claude: { instructions: { enabled: true }, mcp: { enabled: false } },
+          cursor: { skills: { enabled: true } },
+        },
+        skills: [{ path: "skills/*" }],
+        commands: [{ path: "commands/*.md" }],
+        tools: [{ path: "tools/*.yaml" }],
+      })
+    );
 
     const result = await loadConfigFile(configPath);
     expect(result.version).toBe("1");
-    expect(result.targets).toEqual(["claude-code", "cursor"]);
+    expect(result.agents.claude?.instructions?.enabled).toBe(true);
+    expect(result.agents.cursor?.skills?.enabled).toBe(true);
+    expect(result.skills).toEqual([{ path: "skills/*" }]);
   });
 
   it("throws on invalid config", async () => {
     const configPath = join(tempDir, "agsync.yaml");
-    await writeFile(configPath, "targets: []");
+    await writeFile(
+      configPath,
+      toYaml({
+        version: "1",
+        agents: {
+          bad: { instructions: "not-an-object" },
+        },
+      })
+    );
 
     await expect(loadConfigFile(configPath)).rejects.toThrow();
   });
 });
 
 describe("loadFullConfig", () => {
-  it("loads directory-based skills with <name>/<name>.yaml", async () => {
+  it("loads skills from SKILL.md (frontmatter + body)", async () => {
     const skillDir = join(tempDir, "skills", "my-skill");
     await mkdir(skillDir, { recursive: true });
     await writeFile(
-      join(skillDir, "my-skill.yaml"),
-      toYaml({ name: "my-skill", description: "A test skill", instructions: "Do testing" })
+      join(skillDir, "SKILL.md"),
+      skillMd(
+        { name: "my-skill", description: "A test skill" },
+        "Do testing"
+      )
     );
 
     await mkdir(join(tempDir, "tools"), { recursive: true });
     const tool = { name: "test-tool", description: "A test tool", type: "cli", command: "echo" };
     await writeFile(join(tempDir, "tools", "test.yaml"), toYaml(tool));
 
-    const config = {
-      version: "1",
-      targets: ["codex"],
-      skills: [{ path: "skills/*" }],
-      tools: [{ path: "tools/*.yaml" }],
-    };
-    await writeFile(join(tempDir, "agsync.yaml"), toYaml(config));
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      agsyncYaml({
+        skills: [{ path: "skills/*" }],
+        tools: [{ path: "tools/*.yaml" }],
+      })
+    );
 
     const result = await loadFullConfig(join(tempDir, "agsync.yaml"));
 
     expect(result.skills).toHaveLength(1);
     expect(result.skills[0].name).toBe("my-skill");
+    expect(result.skills[0].description).toBe("A test skill");
+    expect(result.skills[0].instructions).toBe("Do testing");
     expect(result.tools).toHaveLength(1);
     expect(result.tools[0].name).toBe("test-tool");
   });
 
-  it("returns empty arrays when no files match patterns", async () => {
-    const config = {
-      version: "1",
-      targets: ["codex"],
-      skills: [{ path: "skills/*" }],
-    };
-    await writeFile(join(tempDir, "agsync.yaml"), toYaml(config));
+  it("loads commands from .md files (name from filename, raw content)", async () => {
+    await mkdir(join(tempDir, "commands"), { recursive: true });
+    const body = "# My command\n\nRun `agsync sync`.";
+    await writeFile(join(tempDir, "commands", "review.md"), body);
 
-    const result = await loadFullConfig(join(tempDir, "agsync.yaml"));
-    expect(result.skills).toHaveLength(0);
-  });
-
-  it("loads skill with source field", async () => {
-    const skillDir = join(tempDir, "skills", "sourced");
-    await mkdir(skillDir, { recursive: true });
     await writeFile(
-      join(skillDir, "sourced.yaml"),
-      toYaml({
-        name: "sourced",
-        description: "Has source",
-        instructions: "Do things",
-        source: { registry: "github", org: "test-org", repo: "test-repo", path: "skills/sourced" },
+      join(tempDir, "agsync.yaml"),
+      agsyncYaml({
+        commands: [{ path: "commands/*.md" }],
       })
     );
 
-    const config = { version: "1", targets: ["codex"], skills: [{ path: "skills/*" }] };
-    await writeFile(join(tempDir, "agsync.yaml"), toYaml(config));
+    const result = await loadFullConfig(join(tempDir, "agsync.yaml"));
+
+    expect(result.commands).toHaveLength(1);
+    expect(result.commands[0]).toEqual({ name: "review", content: body });
+  });
+
+  it("returns empty arrays when no files match patterns", async () => {
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      agsyncYaml({
+        skills: [{ path: "skills/*" }],
+        commands: [{ path: "commands/*.md" }],
+        tools: [{ path: "tools/*.yaml" }],
+      })
+    );
+
+    const result = await loadFullConfig(join(tempDir, "agsync.yaml"));
+    expect(result.skills).toHaveLength(0);
+    expect(result.commands).toHaveLength(0);
+    expect(result.tools).toHaveLength(0);
+  });
+
+  it("loads skill source and optional frontmatter fields from SKILL.md", async () => {
+    const skillDir = join(tempDir, "skills", "sourced");
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(
+      join(skillDir, "SKILL.md"),
+      skillMd(
+        {
+          name: "sourced",
+          description: "Has source",
+          extends: ["base-skill"],
+          tools: ["test-tool"],
+          source: {
+            registry: "github",
+            org: "test-org",
+            repo: "test-repo",
+            path: "skills/sourced",
+          },
+        },
+        "Instructions body"
+      )
+    );
+
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      agsyncYaml({ skills: [{ path: "skills/*" }] })
+    );
 
     const result = await loadFullConfig(join(tempDir, "agsync.yaml"));
     expect(result.skills[0].source).toBeDefined();
     expect(result.skills[0].source!.org).toBe("test-org");
+    expect(result.skills[0].extends).toEqual(["base-skill"]);
+    expect(result.skills[0].tools).toEqual(["test-tool"]);
+    expect(result.skills[0].instructions).toBe("Instructions body");
   });
 });

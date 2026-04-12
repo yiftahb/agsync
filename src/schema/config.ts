@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-export const targetClientSchema = z.enum(["claude-code", "codex", "cursor", "windsurf"]);
-
 export const toolDefinitionSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
@@ -24,7 +22,7 @@ export const skillDefinitionSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
   extends: z.array(z.string()).optional(),
-  instructions: z.string().min(1).optional(),
+  instructions: z.string().optional(),
   tools: z.array(z.string()).optional(),
   source: skillSourceSchema.optional(),
 });
@@ -32,6 +30,9 @@ export const skillDefinitionSchema = z.object({
 export const skillMdFrontmatterSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
+  extends: z.array(z.string()).optional(),
+  tools: z.array(z.string()).optional(),
+  source: skillSourceSchema.optional(),
   license: z.string().optional(),
   metadata: z
     .object({
@@ -46,9 +47,32 @@ export const pathRefSchema = z.object({
   path: z.string().min(1),
 });
 
+export const agentFeatureConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  destination: z.string().optional(),
+  merge_strategy: z.enum(["merge", "override"]).optional(),
+});
+
+export const agentConfigSchema = z.object({
+  instructions: agentFeatureConfigSchema.optional(),
+  skills: agentFeatureConfigSchema.optional(),
+  commands: agentFeatureConfigSchema.optional(),
+  mcp: agentFeatureConfigSchema.optional(),
+});
+
+export const globalFeaturesSchema = z.object({
+  instructions: z.boolean().default(false),
+  skills: z.boolean().default(false),
+  commands: z.boolean().default(false),
+  mcp: z.boolean().default(false),
+});
+
 export const agsyncConfigSchema = z.object({
   version: z.string().default("1"),
-  targets: z.array(targetClientSchema).min(1),
+  features: globalFeaturesSchema.default({}),
+  gitignore: z.enum(["on", "off", "mcpOnly"]).default("mcpOnly"),
+  agents: z.record(agentConfigSchema).default({}),
   skills: z.array(pathRefSchema).default([]),
+  commands: z.array(pathRefSchema).default([]),
   tools: z.array(pathRefSchema).default([]),
 });

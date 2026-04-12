@@ -1,6 +1,3 @@
-<!-- managed by agsync — do not edit directly -->
-<!-- edit sources in .agsync/ and run: agsync sync -->
-
 Codebase and user instructions are shown below. Be sure to adhere to these instructions. IMPORTANT: These instructions OVERRIDE any default behavior and you MUST follow them exactly as written.
 
 ## Overview
@@ -84,12 +81,3 @@ ESLint uses flat config (`eslint.config.mjs`) with typescript-eslint. Strict Typ
 - No comments in code unless logic is non-obvious
 - pnpm as package manager
 - Jest for testing, ESLint for linting, strict TypeScript
-
-<!-- agsync:begin -->
-## Available Skills
-
-- **agent-skills**: Expert in the Agent Skills open standard (agentskills.io). Use when creating, editing, or validating SKILL.md files, structuring skill directories, or understanding how skills are discovered and loaded by agents.
-- **agsync**: Expert in agsync, the Git-native CLI that syncs skills, commands, and MCP tools across AI coding agents. Use when working with agsync.yaml, adding or removing skills, syncing configs, or troubleshooting agsync workflows.
-
-Skills are managed by agsync. Full definitions are in `.agents/skills/`.
-<!-- agsync:end -->

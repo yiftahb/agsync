@@ -1,4 +1,13 @@
-import { mkdtemp, writeFile, mkdir, readFile, rm, stat, lstat, readlink } from "node:fs/promises";
+import {
+  mkdtemp,
+  writeFile,
+  mkdir,
+  readFile,
+  rm,
+  stat,
+  lstat,
+  readlink,
+} from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { stringify as toYaml } from "yaml";
@@ -15,8 +24,33 @@ afterEach(async () => {
   await rm(tempDir, { recursive: true, force: true });
 });
 
-async function setupProject(dir: string) {
-  const skillDir = join(dir, ".agsync", "skills", "helper");
+const MANAGED = "managed by agsync";
+
+function defaultAgents() {
+  return {
+    claude: {
+      instructions: { enabled: true },
+      skills: { enabled: true },
+      mcp: { enabled: true },
+    },
+    codex: {
+      instructions: { enabled: true },
+      skills: { enabled: true },
+      mcp: { enabled: true },
+    },
+    cursor: {
+      skills: { enabled: true },
+      mcp: { enabled: true },
+    },
+  };
+}
+
+async function setupProject(
+  dir: string,
+  agents?: Record<string, unknown>,
+  extra?: Record<string, unknown>
+) {
+  const skillDir = join(dir, ".agsync", "skills", "test-skill");
   await mkdir(skillDir, { recursive: true });
   await mkdir(join(dir, ".agsync", "tools"), { recursive: true });
 
@@ -24,19 +58,28 @@ async function setupProject(dir: string) {
     join(dir, "agsync.yaml"),
     toYaml({
       version: "1",
-      targets: ["claude-code", "codex", "cursor"],
+      features: { instructions: true, skills: true, commands: true, mcp: true },
+      agents: agents ?? defaultAgents(),
       skills: [{ path: ".agsync/skills/*" }],
       tools: [{ path: ".agsync/tools/*.yaml" }],
+      ...extra,
     })
   );
 
   await writeFile(
-    join(skillDir, "helper.yaml"),
-    toYaml({
-      name: "helper",
-      description: "A helpful assistant",
-      instructions: "Help the user with coding tasks",
-    })
+    join(dir, ".agsync", "instructions.md"),
+    "# Project\n\nCustom instructions from `.agsync/instructions.md`.\n"
+  );
+
+  await writeFile(
+    join(skillDir, "SKILL.md"),
+    `---
+name: test-skill
+description: A helpful assistant
+---
+
+Help the user with coding tasks
+`
   );
 
   await writeFile(
@@ -52,82 +95,53 @@ async function setupProject(dir: string) {
 }
 
 describe("runSync", () => {
-  it("injects agsync section into AGENTS.md", async () => {
+  it("generates AGENTS.md with managed header, instructions, and skill listing", async () => {
     await setupProject(tempDir);
     await runSync(tempDir);
 
     const content = await readFile(join(tempDir, "AGENTS.md"), "utf-8");
+    expect(content).toContain(MANAGED);
     expect(content).toContain("<!-- agsync:begin -->");
     expect(content).toContain("<!-- agsync:end -->");
-    expect(content).toContain("**helper**");
+    expect(content).toContain("**test-skill**");
     expect(content).toContain(".agents/skills/");
+    expect(content).toContain("Custom instructions from `.agsync/instructions.md`.");
   });
 
-  it("preserves existing content outside agsync markers", async () => {
-    await setupProject(tempDir);
-    await writeFile(join(tempDir, "AGENTS.md"), "# My Project\n\nCustom content.\n");
-
-    await runSync(tempDir);
-
-    const content = await readFile(join(tempDir, "AGENTS.md"), "utf-8");
-    expect(content).toContain("# My Project");
-    expect(content).toContain("Custom content.");
-    expect(content).toContain("<!-- agsync:begin -->");
-  });
-
-  it("replaces existing agsync section on re-sync", async () => {
-    await setupProject(tempDir);
-    await writeFile(
-      join(tempDir, "AGENTS.md"),
-      "# Project\n\n<!-- agsync:begin -->\nold\n<!-- agsync:end -->\n\n## Notes\n"
-    );
-
-    await runSync(tempDir);
-
-    const content = await readFile(join(tempDir, "AGENTS.md"), "utf-8");
-    expect(content).toContain("# Project");
-    expect(content).toContain("## Notes");
-    expect(content).not.toContain("old\n<!-- agsync:end -->");
-    expect(content).toContain("**helper**");
-  });
-
-  it("injects agsync section into CLAUDE.md when claude-code is target", async () => {
-    await setupProject(tempDir);
-    await runSync(tempDir);
-
-    const content = await readFile(join(tempDir, "CLAUDE.md"), "utf-8");
-    expect(content).toContain("<!-- agsync:begin -->");
-    expect(content).toContain("<!-- agsync:end -->");
-    expect(content).toContain("**helper**");
-    expect(content).toContain(".claude/skills/");
-  });
-
-  it("does not create CLAUDE.md when claude-code is not a target", async () => {
-    await setupProject(tempDir);
-    await writeFile(
-      join(tempDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        targets: ["codex", "cursor"],
-        skills: [{ path: ".agsync/skills/*" }],
-        tools: [{ path: ".agsync/tools/*.yaml" }],
-      })
-    );
-    await runSync(tempDir);
-
-    await expect(stat(join(tempDir, "CLAUDE.md"))).rejects.toThrow();
-  });
-
-  it("generates .agents/skills/<name>/SKILL.md as canonical output", async () => {
+  it("writes .agents/skills/test-skill/SKILL.md with managed header", async () => {
     await setupProject(tempDir);
     await runSync(tempDir);
 
     const content = await readFile(
-      join(tempDir, ".agents", "skills", "helper", "SKILL.md"),
+      join(tempDir, ".agents", "skills", "test-skill", "SKILL.md"),
       "utf-8"
     );
-    expect(content).toContain("name: helper");
+    expect(content).toContain(MANAGED);
+    expect(content).toContain("name: test-skill");
     expect(content).toContain("Help the user with coding tasks");
+  });
+
+  it("creates CLAUDE.md as a symlink to AGENTS.md when Claude instructions are enabled", async () => {
+    await setupProject(tempDir);
+    await runSync(tempDir);
+
+    const s = await lstat(join(tempDir, "CLAUDE.md"));
+    expect(s.isSymbolicLink()).toBe(true);
+    expect(await readlink(join(tempDir, "CLAUDE.md"))).toBe("AGENTS.md");
+
+    const viaSymlink = await readFile(join(tempDir, "CLAUDE.md"), "utf-8");
+    expect(viaSymlink).toContain(MANAGED);
+    expect(viaSymlink).toContain("**test-skill**");
+  });
+
+  it("does not create CLAUDE.md when Claude is not configured", async () => {
+    await setupProject(tempDir, {
+      codex: { skills: { enabled: true } },
+      cursor: { skills: { enabled: true } },
+    });
+    await runSync(tempDir);
+
+    await expect(stat(join(tempDir, "CLAUDE.md"))).rejects.toThrow();
   });
 
   it("creates .claude/skills as a symlink to ../.agents/skills", async () => {
@@ -137,40 +151,33 @@ describe("runSync", () => {
     const claudeSkills = join(tempDir, ".claude", "skills");
     const s = await lstat(claudeSkills);
     expect(s.isSymbolicLink()).toBe(true);
-
-    const target = await readlink(claudeSkills);
-    expect(target).toBe(join("..", ".agents", "skills"));
+    expect(await readlink(claudeSkills)).toBe(join("..", ".agents", "skills"));
   });
 
-  it("makes .claude/skills/<name>/SKILL.md readable through the symlink", async () => {
+  it("reads synced SKILL.md through the .claude/skills symlink", async () => {
     await setupProject(tempDir);
     await runSync(tempDir);
 
     const content = await readFile(
-      join(tempDir, ".claude", "skills", "helper", "SKILL.md"),
+      join(tempDir, ".claude", "skills", "test-skill", "SKILL.md"),
       "utf-8"
     );
-    expect(content).toContain("name: helper");
-    expect(content).toContain("Help the user with coding tasks");
+    expect(content).toContain(MANAGED);
+    expect(content).toContain("name: test-skill");
   });
 
-  it("does not create .claude/skills symlink when claude-code is not a target", async () => {
-    await setupProject(tempDir);
-    await writeFile(
-      join(tempDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        targets: ["codex", "cursor"],
-        skills: [{ path: ".agsync/skills/*" }],
-        tools: [{ path: ".agsync/tools/*.yaml" }],
-      })
-    );
+  it("does not create .claude/skills when Claude skills are disabled", async () => {
+    await setupProject(tempDir, {
+      claude: { mcp: { enabled: true } },
+      codex: { skills: { enabled: true } },
+      cursor: { skills: { enabled: true } },
+    });
     await runSync(tempDir);
 
     await expect(lstat(join(tempDir, ".claude", "skills"))).rejects.toThrow();
   });
 
-  it("re-creates symlink on re-sync", async () => {
+  it("re-creates symlinks on re-sync", async () => {
     await setupProject(tempDir);
     await runSync(tempDir);
     await runSync(tempDir);
@@ -179,7 +186,7 @@ describe("runSync", () => {
     expect(s.isSymbolicLink()).toBe(true);
   });
 
-  it("generates .claude/settings.json with MCP config", async () => {
+  it("generates Claude MCP JSON at .claude/settings.json", async () => {
     await setupProject(tempDir);
     await runSync(tempDir);
 
@@ -188,7 +195,7 @@ describe("runSync", () => {
     expect(parsed.mcpServers["my-mcp"]).toBeDefined();
   });
 
-  it("generates .cursor/mcp.json", async () => {
+  it("generates Cursor MCP JSON at .cursor/mcp.json", async () => {
     await setupProject(tempDir);
     await runSync(tempDir);
 
@@ -197,38 +204,31 @@ describe("runSync", () => {
     expect(parsed.mcpServers["my-mcp"]).toBeDefined();
   });
 
-  it("creates .windsurf/skills as a symlink to ../.agents/skills", async () => {
+  it("generates Codex MCP TOML at .codex/config.toml", async () => {
     await setupProject(tempDir);
-    await writeFile(
-      join(tempDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        targets: ["codex", "windsurf"],
-        skills: [{ path: ".agsync/skills/*" }],
-        tools: [{ path: ".agsync/tools/*.yaml" }],
-      })
-    );
+    await runSync(tempDir);
+
+    const content = await readFile(join(tempDir, ".codex", "config.toml"), "utf-8");
+    expect(content).toContain("mcp_servers");
+    expect(content).toContain("my-mcp");
+  });
+
+  it("creates .windsurf/skills symlink when Windsurf skills are enabled", async () => {
+    await setupProject(tempDir, {
+      windsurf: { skills: { enabled: true } },
+    });
     await runSync(tempDir);
 
     const windsurfSkills = join(tempDir, ".windsurf", "skills");
     const s = await lstat(windsurfSkills);
     expect(s.isSymbolicLink()).toBe(true);
-
-    const target = await readlink(windsurfSkills);
-    expect(target).toBe(join("..", ".agents", "skills"));
+    expect(await readlink(windsurfSkills)).toBe(join("..", ".agents", "skills"));
   });
 
-  it("generates .windsurf/mcp_config.json", async () => {
-    await setupProject(tempDir);
-    await writeFile(
-      join(tempDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        targets: ["windsurf"],
-        skills: [{ path: ".agsync/skills/*" }],
-        tools: [{ path: ".agsync/tools/*.yaml" }],
-      })
-    );
+  it("generates .windsurf/mcp_config.json when Windsurf MCP is enabled", async () => {
+    await setupProject(tempDir, {
+      windsurf: { mcp: { enabled: true } },
+    });
     await runSync(tempDir);
 
     const content = await readFile(join(tempDir, ".windsurf", "mcp_config.json"), "utf-8");
@@ -236,7 +236,7 @@ describe("runSync", () => {
     expect(parsed.mcpServers["my-mcp"]).toBeDefined();
   });
 
-  it("does not create .windsurf/skills symlink when windsurf is not a target", async () => {
+  it("does not create .windsurf/skills when Windsurf is not configured", async () => {
     await setupProject(tempDir);
     await runSync(tempDir);
 
@@ -307,14 +307,68 @@ describe("runSync", () => {
 
     await writeFile(
       join(tempDir, "agsync.yaml"),
-      toYaml({ version: "1", targets: ["codex"], skills: [{ path: ".agsync/skills/*" }] })
+      toYaml({
+        version: "1",
+        features: { instructions: true, skills: true, commands: true, mcp: true },
+        agents: { codex: { skills: { enabled: true } } },
+        skills: [{ path: ".agsync/skills/*" }],
+        tools: [],
+      })
     );
 
     await writeFile(
-      join(skillDir, "bad.yaml"),
-      toYaml({ name: "bad", description: "Bad", instructions: "Bad", tools: ["nonexistent"] })
+      join(skillDir, "SKILL.md"),
+      `---
+name: bad
+description: Bad
+tools:
+  - nonexistent
+---
+
+Body
+`
     );
 
     await expect(runSync(tempDir)).rejects.toThrow("Validation failed");
+  });
+
+  it("generates gitignore with mcpOnly mode by default", async () => {
+    await setupProject(tempDir, defaultAgents(), { gitignore: "mcpOnly" });
+    await runSync(tempDir);
+
+    const gitignore = await readFile(join(tempDir, ".gitignore"), "utf-8");
+    expect(gitignore).toContain("# agsync:begin");
+    expect(gitignore).toContain("# agsync:end");
+    expect(gitignore).toContain(".claude/settings.json");
+    expect(gitignore).toContain(".cursor/mcp.json");
+    expect(gitignore).toContain(".codex/config.toml");
+    expect(gitignore).not.toContain("AGENTS.md");
+  });
+
+  it("generates gitignore with on mode including all output", async () => {
+    await setupProject(tempDir, defaultAgents(), { gitignore: "on" });
+    await runSync(tempDir);
+
+    const gitignore = await readFile(join(tempDir, ".gitignore"), "utf-8");
+    expect(gitignore).toContain("# agsync:begin");
+    expect(gitignore).toContain("AGENTS.md");
+    expect(gitignore).toContain(".agents/");
+  });
+
+  it("does not create gitignore with off mode", async () => {
+    await setupProject(tempDir, defaultAgents(), { gitignore: "off" });
+    await runSync(tempDir);
+
+    await expect(stat(join(tempDir, ".gitignore"))).rejects.toThrow();
+  });
+
+  it("global features mask disables agent features", async () => {
+    await setupProject(tempDir, defaultAgents(), {
+      features: { instructions: true, skills: true, commands: true, mcp: false },
+    });
+    await runSync(tempDir);
+
+    await expect(stat(join(tempDir, ".claude", "settings.json"))).rejects.toThrow();
+    await expect(stat(join(tempDir, ".cursor", "mcp.json"))).rejects.toThrow();
   });
 });

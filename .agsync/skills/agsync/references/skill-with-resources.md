@@ -1,12 +1,12 @@
 # Skill with Scripts, References, and Assets
 
-Skills can include executable scripts, reference documentation, and asset files alongside the YAML definition.
+Skills can include executable scripts, reference documentation, and asset files alongside the SKILL.md definition.
 
 ## Directory Structure
 
 ```
 .agsync/skills/db-migrations/
-├── db-migrations.yaml
+├── SKILL.md
 ├── scripts/
 │   └── check-migration.sh     # Agents can execute this
 ├── references/
@@ -17,18 +17,20 @@ Skills can include executable scripts, reference documentation, and asset files 
 
 ## Skill Definition
 
-```yaml
-# .agsync/skills/db-migrations/db-migrations.yaml
+```markdown
+<!-- .agsync/skills/db-migrations/SKILL.md -->
+---
 name: db-migrations
 description: >
   Database migration expert. Use when creating, reviewing, or
   troubleshooting database migrations.
-instructions: |
-  You are an expert in database migrations.
+---
 
-  Before creating a migration, run scripts/check-migration.sh to
-  validate the current schema state. Refer to references/schema-guide.md
-  for naming conventions and best practices.
+You are an expert in database migrations.
+
+Before creating a migration, run scripts/check-migration.sh to
+validate the current schema state. Refer to references/schema-guide.md
+for naming conventions and best practices.
 ```
 
 ## Resource Directories

@@ -4,8 +4,32 @@ import { tmpdir } from "node:os";
 import { stringify as toYaml } from "yaml";
 import { buildSyncPlan } from "@/commands/sync";
 import { runPlan, formatPlan } from "@/commands/plan";
+import type { SyncPlan } from "@/types";
 
 let tempDir: string;
+
+function skillMd(frontmatter: Record<string, unknown>, body: string): string {
+  return `---\n${toYaml(frontmatter).trim()}\n---\n\n${body}\n`;
+}
+
+function agentsThreeWay(): Record<string, unknown> {
+  return {
+    claude: {
+      instructions: { enabled: true },
+      skills: { enabled: true },
+      mcp: { enabled: true },
+    },
+    codex: {
+      instructions: { enabled: true },
+      skills: { enabled: true },
+      mcp: { enabled: true },
+    },
+    cursor: {
+      skills: { enabled: true },
+      mcp: { enabled: true },
+    },
+  };
+}
 
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), "agsync-plan-"));
@@ -25,19 +49,20 @@ async function setupProject(dir: string) {
     join(dir, "agsync.yaml"),
     toYaml({
       version: "1",
-      targets: ["claude-code", "codex", "cursor"],
+      features: { instructions: true, skills: true, commands: true, mcp: true },
+      agents: agentsThreeWay(),
       skills: [{ path: ".agsync/skills/*" }],
+      commands: [],
       tools: [{ path: ".agsync/tools/*.yaml" }],
     })
   );
 
   await writeFile(
-    join(skillDir, "helper.yaml"),
-    toYaml({
-      name: "helper",
-      description: "A helpful assistant",
-      instructions: "Help the user with coding tasks",
-    })
+    join(skillDir, "SKILL.md"),
+    skillMd(
+      { name: "helper", description: "A helpful assistant" },
+      "Help the user with coding tasks"
+    )
   );
 
   await writeFile(
@@ -81,7 +106,7 @@ describe("buildSyncPlan", () => {
     expect(deletes).toEqual([{ name: "old-skill", operation: "delete" }]);
   });
 
-  it("plans file creation for skill files and symlinks", async () => {
+  it("plans file creation for skill files, AGENTS.md, agent outputs, and skill symlinks", async () => {
     await setupProject(tempDir);
     const plan = await buildSyncPlan(tempDir);
 
@@ -97,17 +122,18 @@ describe("buildSyncPlan", () => {
     expect(symlinkEntry!.symlink).toBe(join("..", ".agents", "skills"));
   });
 
-  it("plans updates when files already exist", async () => {
+  it("plans updates when AGENTS.md exists and generated content differs", async () => {
     await setupProject(tempDir);
-    await writeFile(join(tempDir, "AGENTS.md"), "# Existing\n");
+    await writeFile(join(tempDir, ".agsync", "instructions.md"), "# Project intro\n");
+    await writeFile(join(tempDir, "AGENTS.md"), "# Stale root\n");
 
     const plan = await buildSyncPlan(tempDir);
 
     const agentsMd = plan.files.find((f) => f.path === join(tempDir, "AGENTS.md"));
     expect(agentsMd).toBeDefined();
     expect(agentsMd!.operation).toBe("update");
-    expect(agentsMd!.existing).toBe("# Existing\n");
-    expect(agentsMd!.content).toContain("# Existing");
+    expect(agentsMd!.existing).toBe("# Stale root\n");
+    expect(agentsMd!.content).toContain("# Project intro");
     expect(agentsMd!.content).toContain("<!-- agsync:begin -->");
   });
 
@@ -124,14 +150,19 @@ describe("buildSyncPlan", () => {
     expect(agentsExists).toBe(false);
   });
 
-  it("plans .windsurf/skills symlink when windsurf is a target", async () => {
+  it("plans .windsurf/skills symlink when windsurf has skills enabled", async () => {
     await setupProject(tempDir);
     await writeFile(
       join(tempDir, "agsync.yaml"),
       toYaml({
         version: "1",
-        targets: ["codex", "windsurf"],
+        features: { instructions: true, skills: true, commands: true, mcp: true },
+        agents: {
+          codex: { skills: { enabled: true }, mcp: { enabled: true } },
+          windsurf: { skills: { enabled: true } },
+        },
         skills: [{ path: ".agsync/skills/*" }],
+        commands: [],
         tools: [{ path: ".agsync/tools/*.yaml" }],
       })
     );
@@ -143,7 +174,7 @@ describe("buildSyncPlan", () => {
     expect(symlinkEntry!.symlink).toBe(join("..", ".agents", "skills"));
   });
 
-  it("does not plan .windsurf/skills symlink when windsurf is not a target", async () => {
+  it("does not plan .windsurf/skills symlink when windsurf is not configured", async () => {
     await setupProject(tempDir);
     const plan = await buildSyncPlan(tempDir);
 
@@ -151,14 +182,18 @@ describe("buildSyncPlan", () => {
     expect(symlinkEntry).toBeUndefined();
   });
 
-  it("does not plan CLAUDE.md when claude-code is not a target", async () => {
+  it("does not plan CLAUDE.md when claude is not in agents config", async () => {
     await setupProject(tempDir);
     await writeFile(
       join(tempDir, "agsync.yaml"),
       toYaml({
         version: "1",
-        targets: ["codex"],
+        features: { instructions: true, skills: true, commands: true, mcp: true },
+        agents: {
+          codex: { skills: { enabled: true }, mcp: { enabled: true } },
+        },
         skills: [{ path: ".agsync/skills/*" }],
+        commands: [],
         tools: [{ path: ".agsync/tools/*.yaml" }],
       })
     );
@@ -192,12 +227,22 @@ describe("buildSyncPlan", () => {
 
     await writeFile(
       join(tempDir, "agsync.yaml"),
-      toYaml({ version: "1", targets: ["codex"], skills: [{ path: ".agsync/skills/*" }] })
+      toYaml({
+        version: "1",
+        features: { instructions: true, skills: true, commands: true, mcp: true },
+        agents: { codex: { skills: { enabled: true } } },
+        skills: [{ path: ".agsync/skills/*" }],
+        commands: [],
+        tools: [],
+      })
     );
 
     await writeFile(
-      join(skillDir, "bad.yaml"),
-      toYaml({ name: "bad", description: "Bad", instructions: "Bad", tools: ["nonexistent"] })
+      join(skillDir, "SKILL.md"),
+      skillMd(
+        { name: "bad", description: "Bad", tools: ["nonexistent"] },
+        "Bad"
+      )
     );
 
     await expect(buildSyncPlan(tempDir)).rejects.toThrow("Validation failed");
@@ -216,11 +261,11 @@ describe("buildSyncPlan", () => {
 
 describe("formatPlan", () => {
   it("formats skill creates, updates, and deletes", () => {
-    const plan = {
+    const plan: SyncPlan = {
       skills: [
-        { name: "new-skill", operation: "create" as const },
-        { name: "existing", operation: "update" as const },
-        { name: "old", operation: "delete" as const },
+        { name: "new-skill", operation: "create" },
+        { name: "existing", operation: "update" },
+        { name: "old", operation: "delete" },
       ],
       files: [],
       skillOutputDirs: [],
@@ -236,10 +281,10 @@ describe("formatPlan", () => {
   });
 
   it("formats file changes alongside skills", () => {
-    const plan = {
-      skills: [{ name: "s", operation: "create" as const }],
+    const plan: SyncPlan = {
+      skills: [{ name: "s", operation: "create" }],
       files: [
-        { path: "/project/AGENTS.md", content: "x", existing: "", operation: "create" as const },
+        { path: "/project/AGENTS.md", content: "x", existing: "", operation: "create" },
       ],
       skillOutputDirs: [],
       canonicalSkillsDir: "/project/.agsync/skills",
@@ -253,15 +298,15 @@ describe("formatPlan", () => {
   });
 
   it("formats symlink entries distinctly", () => {
-    const plan = {
-      skills: [{ name: "s", operation: "create" as const }],
+    const plan: SyncPlan = {
+      skills: [{ name: "s", operation: "create" }],
       files: [
         {
           path: "/project/.claude/skills",
           content: "",
           existing: "",
-          operation: "create" as const,
-          symlink: "../.agents/skills",
+          operation: "create",
+          symlink: join("..", ".agents", "skills"),
         },
       ],
       skillOutputDirs: [],
@@ -271,12 +316,18 @@ describe("formatPlan", () => {
     const output = formatPlan(plan, "/project");
 
     expect(output).toContain("(symlink)");
-    expect(output).toContain("../.agents/skills");
+    expect(output).toContain(join("..", ".agents", "skills"));
   });
 
   it("reports no changes when plan is empty", () => {
     const output = formatPlan(
-      { skills: [], files: [], skillOutputDirs: [], canonicalSkillsDir: "/project/.agsync/skills", warnings: [] },
+      {
+        skills: [],
+        files: [],
+        skillOutputDirs: [],
+        canonicalSkillsDir: "/project/.agsync/skills",
+        warnings: [],
+      },
       "/project"
     );
     expect(output).toContain("No changes needed");

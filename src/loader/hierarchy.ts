@@ -1,6 +1,6 @@
 import { resolve, dirname } from "node:path";
 import { findConfigFile, loadFullConfig } from "@/loader/config";
-import type { LoadedConfig, TargetClient } from "@/types";
+import type { LoadedConfig, UserAgentConfig, GlobalFeatures, GitignoreMode } from "@/types";
 import { existsSync } from "node:fs";
 
 function findGitRoot(startDir: string): string {
@@ -37,9 +37,38 @@ export async function collectConfigChain(startDir: string): Promise<string[]> {
   return configPaths;
 }
 
-function mergeTargets(base: TargetClient[], overlay: TargetClient[]): TargetClient[] {
-  const set = new Set([...base, ...overlay]);
-  return [...set];
+function mergeGlobalFeatures(base: GlobalFeatures, overlay: GlobalFeatures): GlobalFeatures {
+  return {
+    instructions: overlay.instructions || base.instructions,
+    skills: overlay.skills || base.skills,
+    commands: overlay.commands || base.commands,
+    mcp: overlay.mcp || base.mcp,
+  };
+}
+
+function mergeAgentFeature<T>(base: T | undefined, overlay: T | undefined): T | undefined {
+  if (!overlay) return base;
+  if (!base) return overlay;
+  return { ...base, ...overlay };
+}
+
+function mergeAgents(
+  base: Record<string, Partial<UserAgentConfig>>,
+  overlay: Record<string, Partial<UserAgentConfig>>
+): Record<string, Partial<UserAgentConfig>> {
+  const merged = { ...base };
+
+  for (const [name, overlayCfg] of Object.entries(overlay)) {
+    const baseCfg = merged[name] ?? {};
+    merged[name] = {
+      instructions: mergeAgentFeature(baseCfg.instructions, overlayCfg.instructions),
+      skills: mergeAgentFeature(baseCfg.skills, overlayCfg.skills),
+      commands: mergeAgentFeature(baseCfg.commands, overlayCfg.commands),
+      mcp: mergeAgentFeature(baseCfg.mcp, overlayCfg.mcp),
+    };
+  }
+
+  return merged;
 }
 
 export async function loadHierarchicalConfig(startDir: string): Promise<LoadedConfig | null> {
@@ -58,11 +87,15 @@ export async function loadHierarchicalConfig(startDir: string): Promise<LoadedCo
     return {
       config: {
         version: current.config.version,
-        targets: mergeTargets(merged.config.targets, current.config.targets),
+        features: mergeGlobalFeatures(merged.config.features, current.config.features),
+        gitignore: (current.config.gitignore ?? merged.config.gitignore) as GitignoreMode,
+        agents: mergeAgents(merged.config.agents, current.config.agents),
         skills: [...merged.config.skills, ...current.config.skills],
+        commands: [...merged.config.commands, ...current.config.commands],
         tools: [...merged.config.tools, ...current.config.tools],
       },
       skills: [...merged.skills, ...current.skills],
+      commands: [...merged.commands, ...current.commands],
       tools: [...merged.tools, ...current.tools],
       configPath: current.configPath,
     };

@@ -15,7 +15,7 @@ const program = new Command();
 
 program
   .name("agsync")
-  .description("Git-native CLI to sync skills and MCP tools across AI coding clients")
+  .description("Git-native CLI to sync skills, commands, and MCP tools across AI coding agents")
   .version(CURRENT_VERSION);
 
 program

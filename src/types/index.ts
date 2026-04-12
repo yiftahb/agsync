@@ -1,4 +1,46 @@
-export type TargetClient = "claude-code" | "codex" | "cursor" | "windsurf";
+export type McpSerializationFormat = "json" | "toml";
+
+export interface McpFormat {
+  format: McpSerializationFormat;
+  root_key: string;
+}
+
+export interface AgentFeatureConfig {
+  enabled: boolean;
+  destination: string;
+  type: "symlink" | "generated";
+  merge_strategy?: "merge" | "override";
+}
+
+export interface AgentMcpFeatureConfig extends AgentFeatureConfig {
+  mcp_format: McpFormat;
+}
+
+export interface UserAgentFeatureConfig {
+  enabled: boolean;
+  destination?: string;
+  merge_strategy?: "merge" | "override";
+}
+
+export interface UserAgentConfig {
+  instructions?: UserAgentFeatureConfig;
+  skills?: UserAgentFeatureConfig;
+  commands?: UserAgentFeatureConfig;
+  mcp?: UserAgentFeatureConfig;
+}
+
+export interface AgentConfig {
+  instructions?: AgentFeatureConfig;
+  skills?: AgentFeatureConfig;
+  commands?: AgentFeatureConfig;
+  mcp?: AgentMcpFeatureConfig;
+}
+
+export interface AgentDefinition {
+  name: string;
+  description: string;
+  features: AgentConfig;
+}
 
 export interface ToolDefinition {
   name: string;
@@ -35,23 +77,46 @@ export interface ResolvedSkill {
   extendsChain: string[];
 }
 
+export interface CommandDefinition {
+  name: string;
+  content: string;
+}
+
+export interface GlobalFeatures {
+  instructions: boolean;
+  skills: boolean;
+  commands: boolean;
+  mcp: boolean;
+}
+
+export type GitignoreMode = "on" | "off" | "mcpOnly";
+
 export interface AgsyncConfig {
   version: string;
-  targets: TargetClient[];
+  features: GlobalFeatures;
+  gitignore: GitignoreMode;
+  agents: Record<string, Partial<UserAgentConfig>>;
   skills: { path: string }[];
+  commands: { path: string }[];
   tools: { path: string }[];
+}
+
+export interface ResolvedAgentConfig {
+  [agentName: string]: AgentConfig;
 }
 
 export interface LoadedConfig {
   config: AgsyncConfig;
   skills: SkillDefinition[];
+  commands: CommandDefinition[];
   tools: ToolDefinition[];
   configPath: string;
 }
 
 export interface ResolvedConfig {
-  targets: TargetClient[];
+  agents: ResolvedAgentConfig;
   skills: ResolvedSkill[];
+  commands: CommandDefinition[];
   tools: ToolDefinition[];
 }
 

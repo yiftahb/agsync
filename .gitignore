@@ -4,3 +4,7 @@ dist/
 coverage/
 .cursor/mcp.json
 .claude/settings.json
+
+# agsync:begin
+.cursor/mcp.json
+# agsync:end

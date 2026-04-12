@@ -1,9 +1,9 @@
-<!-- managed by agsync — do not edit directly -->
-<!-- edit sources in .agsync/ and run: agsync sync -->
-
 ---
 name: agent-skills
-description: Expert in the Agent Skills open standard (agentskills.io). Use when creating, editing, or validating SKILL.md files, structuring skill directories, or understanding how skills are discovered and loaded by agents.
+description: >
+  Expert in the Agent Skills open standard (agentskills.io). Use when creating,
+  editing, or validating SKILL.md files, structuring skill directories, or
+  understanding how skills are discovered and loaded by agents.
 ---
 
 # Agent Skills Standard

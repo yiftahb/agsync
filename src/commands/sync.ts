@@ -1,88 +1,126 @@
-import { mkdir, writeFile, readFile, rm, readdir, stat as fsStat, copyFile, symlink, lstat } from "node:fs/promises";
+import {
+  mkdir, writeFile, readFile, rm, readdir,
+  stat as fsStat, copyFile, symlink, lstat, readlink,
+} from "node:fs/promises";
 import { resolve, dirname, relative } from "node:path";
+import { stringify as toToml } from "smol-toml";
 import { loadHierarchicalConfig } from "@/loader/hierarchy";
 import { resolveAllSkills } from "@/resolver/skills";
-import { getAllConverters, buildSkillMd } from "@/converters";
+import { resolveAgentConfig } from "@/agents/registry";
 import { runValidate } from "@/commands/validate";
 import { expandToolEnv } from "@/utils/env";
-import type { ResolvedConfig, LoadedConfig, SyncPlan, PlannedFile, PlannedSkill } from "@/types";
+import type {
+  ResolvedSkill, SyncPlan, PlannedFile, PlannedSkill,
+  ToolDefinition, AgentConfig, AgentMcpFeatureConfig, CommandDefinition,
+  GitignoreMode, ResolvedAgentConfig,
+} from "@/types";
 
-const AGSYNC_BEGIN = "<!-- agsync:begin -->";
-const AGSYNC_END = "<!-- agsync:end -->";
+const MANAGED_HEADER = [
+  "<!-- managed by agsync — do not edit directly -->",
+  "<!-- edit sources in .agsync/ and run: agsync sync -->",
+  "",
+].join("\n");
 
-function buildResolvedConfig(
-  loaded: LoadedConfig,
-  resolvedSkills: ResolvedConfig["skills"],
-  options?: { expandEnv?: boolean }
-): { config: ResolvedConfig; warnings: string[] } {
-  if (options?.expandEnv === false) {
-    return {
-      config: { targets: loaded.config.targets, skills: resolvedSkills, tools: loaded.tools },
-      warnings: [],
-    };
+function buildOutputSkillMd(skill: ResolvedSkill, tools: ToolDefinition[]): string {
+  const lines: string[] = [];
+
+  lines.push(MANAGED_HEADER);
+  lines.push("---");
+  lines.push(`name: ${skill.name}`);
+  lines.push(`description: ${skill.description}`);
+  lines.push("---");
+  lines.push("");
+  lines.push(skill.instructions.trim());
+
+  if (skill.tools.length > 0) {
+    lines.push("");
+    lines.push("## Available Tools");
+    lines.push("");
+    for (const toolName of skill.tools) {
+      const tool = tools.find((t) => t.name === toolName);
+      if (tool) {
+        lines.push(`- **${tool.name}**: ${tool.description}`);
+      } else {
+        lines.push(`- ${toolName}`);
+      }
+    }
   }
 
-  const { tools, warnings } = expandToolEnv(loaded.tools);
-  return {
-    config: { targets: loaded.config.targets, skills: resolvedSkills, tools },
-    warnings: warnings.map(
-      (w) => `Environment variable "${w.varName}" is not set (tool "${w.tool}", key "${w.key}")`
-    ),
-  };
+  return lines.join("\n") + "\n";
 }
 
-function mergeJsonContent(existing: string, incoming: string): string {
+function buildAgentsMd(
+  userInstructions: string,
+  skills: ResolvedSkill[]
+): string {
+  const lines: string[] = [];
+
+  lines.push(MANAGED_HEADER);
+
+  if (userInstructions.trim()) {
+    lines.push(userInstructions.trim());
+    lines.push("");
+  }
+
+  lines.push("<!-- agsync:begin -->");
+  lines.push("## Available Skills");
+  lines.push("");
+  for (const skill of skills) {
+    lines.push(`- **${skill.name}**: ${skill.description}`);
+  }
+  lines.push("");
+  lines.push("Skills are managed by agsync. Full definitions are in `.agents/skills/`.");
+  lines.push("<!-- agsync:end -->");
+
+  return lines.join("\n") + "\n";
+}
+
+function buildOutputCommand(cmd: CommandDefinition): string {
+  return MANAGED_HEADER + cmd.content;
+}
+
+function buildMcpServersObject(tools: ToolDefinition[]): Record<string, unknown> {
+  const servers: Record<string, unknown> = {};
+  for (const tool of tools) {
+    if (tool.type !== "mcp") continue;
+    servers[tool.name] = {
+      command: tool.command ?? "",
+      args: tool.args ?? [],
+      env: tool.env ?? {},
+    };
+  }
+  return servers;
+}
+
+function serializeMcpJson(
+  rootKey: string,
+  servers: Record<string, unknown>
+): string {
+  return JSON.stringify({ [rootKey]: servers }, null, 2);
+}
+
+function serializeMcpToml(
+  rootKey: string,
+  servers: Record<string, unknown>
+): string {
+  return toToml({ [rootKey]: servers });
+}
+
+function mergeJsonContent(existing: string, incoming: string, rootKey: string): string {
   try {
     const existingObj = JSON.parse(existing);
     const incomingObj = JSON.parse(incoming);
-
-    for (const key of Object.keys(incomingObj)) {
-      if (
-        typeof existingObj[key] === "object" &&
-        existingObj[key] !== null &&
-        typeof incomingObj[key] === "object" &&
-        incomingObj[key] !== null &&
-        !Array.isArray(existingObj[key])
-      ) {
-        existingObj[key] = { ...existingObj[key], ...incomingObj[key] };
-      } else {
-        existingObj[key] = incomingObj[key];
-      }
-    }
-
+    existingObj[rootKey] = { ...(existingObj[rootKey] ?? {}), ...incomingObj[rootKey] };
     return JSON.stringify(existingObj, null, 2);
-  } catch (_) {
-    void _;
+  } catch {
     return incoming;
   }
-}
-
-function injectAgsyncSection(existingContent: string, section: string): string {
-  const beginIndex = existingContent.indexOf(AGSYNC_BEGIN);
-  const endIndex = existingContent.indexOf(AGSYNC_END);
-
-  if (beginIndex !== -1 && endIndex !== -1) {
-    const before = existingContent.slice(0, beginIndex);
-    const after = existingContent.slice(endIndex + AGSYNC_END.length);
-    return before + section + after;
-  }
-
-  if (existingContent.length > 0 && !existingContent.endsWith("\n")) {
-    return existingContent + "\n\n" + section + "\n";
-  }
-
-  if (existingContent.length > 0) {
-    return existingContent + "\n" + section + "\n";
-  }
-
-  return section + "\n";
 }
 
 async function readFileOrEmpty(filePath: string): Promise<string> {
   try {
     return await readFile(filePath, "utf-8");
-  } catch (_) {
-    void _;
+  } catch {
     return "";
   }
 }
@@ -96,21 +134,9 @@ async function listSubdirectories(dir: string): Promise<string[]> {
       if (s.isDirectory()) dirs.push(entry);
     }
     return dirs;
-  } catch (_) {
-    void _;
+  } catch {
     return [];
   }
-}
-
-function getSymlinkDirs(targets: string[], targetDir: string): string[] {
-  const dirs: string[] = [];
-  if (targets.includes("claude-code")) {
-    dirs.push(resolve(targetDir, ".claude", "skills"));
-  }
-  if (targets.includes("windsurf")) {
-    dirs.push(resolve(targetDir, ".windsurf", "skills"));
-  }
-  return dirs;
 }
 
 export async function buildSyncPlan(
@@ -129,23 +155,31 @@ export async function buildSyncPlan(
     throw new Error("No agsync.yaml found");
   }
 
-  const skillsDir = resolve(dirname(loaded.configPath), ".agsync", "skills");
-  const cacheDir = resolve(dirname(loaded.configPath), ".agsync", "cache");
+  const baseDir = dirname(loaded.configPath);
+  const skillsDir = resolve(baseDir, ".agsync", "skills");
+  const cacheDir = resolve(baseDir, ".agsync", "cache");
   const resolvedSkills = await resolveAllSkills(loaded.skills, skillsDir, cacheDir);
-  const { config, warnings } = buildResolvedConfig(loaded, resolvedSkills, {
-    expandEnv: options?.expandEnv,
-  });
 
-  const converters = getAllConverters(config.targets);
-  const plannedFiles: PlannedFile[] = [];
+  let tools = loaded.tools;
+  const warnings: string[] = [];
+  if (options?.expandEnv !== false) {
+    const expanded = expandToolEnv(loaded.tools);
+    tools = expanded.tools;
+    for (const w of expanded.warnings) {
+      warnings.push(`Environment variable "${w.varName}" is not set (tool "${w.tool}", key "${w.key}")`);
+    }
+  }
 
-  const canonicalOutputDir = resolve(targetDir, ".agents", "skills");
-  const skillOutputDirs = [canonicalOutputDir];
+  const agents = resolveAgentConfig(loaded.config.agents, loaded.config.features);
+  const commands = loaded.commands;
 
-  const definedSkillNames = new Set(config.skills.map((s) => s.name));
+  const canonicalSkillsDir = resolve(targetDir, ".agents", "skills");
+  const canonicalCommandsDir = resolve(targetDir, ".agents", "commands");
+  const skillOutputDirs = [canonicalSkillsDir];
 
+  const definedSkillNames = new Set(resolvedSkills.map((s) => s.name));
   const existingSkillNames = new Set<string>();
-  for (const name of await listSubdirectories(canonicalOutputDir)) {
+  for (const name of await listSubdirectories(canonicalSkillsDir)) {
     existingSkillNames.add(name);
   }
 
@@ -162,9 +196,11 @@ export async function buildSyncPlan(
     }
   }
 
-  for (const skill of config.skills) {
-    const skillMdPath = resolve(canonicalOutputDir, skill.name, "SKILL.md");
-    const content = buildSkillMd(skill, config);
+  const plannedFiles: PlannedFile[] = [];
+
+  for (const skill of resolvedSkills) {
+    const skillMdPath = resolve(canonicalSkillsDir, skill.name, "SKILL.md");
+    const content = buildOutputSkillMd(skill, tools);
     const existing = await readFileOrEmpty(skillMdPath);
     plannedFiles.push({
       path: skillMdPath,
@@ -174,60 +210,108 @@ export async function buildSyncPlan(
     });
   }
 
-  for (const symlinkDir of getSymlinkDirs(config.targets, targetDir)) {
-    const symlinkTarget = relative(dirname(symlinkDir), canonicalOutputDir);
+  for (const cmd of commands) {
+    const cmdPath = resolve(canonicalCommandsDir, `${cmd.name}.md`);
+    const content = buildOutputCommand(cmd);
+    const existing = await readFileOrEmpty(cmdPath);
     plannedFiles.push({
-      path: symlinkDir,
-      content: "",
-      existing: "",
-      operation: "create",
-      symlink: symlinkTarget,
+      path: cmdPath,
+      content,
+      existing,
+      operation: !existing ? "create" : content !== existing ? "update" : "unchanged",
     });
   }
 
-  const instructionFiles: { path: string; skillsPath: string }[] = [
-    { path: resolve(targetDir, "AGENTS.md"), skillsPath: ".agents/skills/" },
-  ];
-  if (config.targets.includes("claude-code")) {
-    instructionFiles.push({
-      path: resolve(targetDir, "CLAUDE.md"),
-      skillsPath: ".claude/skills/",
-    });
-  }
-  for (const { path: filePath, skillsPath } of instructionFiles) {
-    const section = converters[0].generateAgsyncSection(config, skillsPath);
-    const existing = await readFileOrEmpty(filePath);
-    const updated = injectAgsyncSection(existing, section);
-    if (updated !== existing) {
-      plannedFiles.push({
-        path: filePath,
-        content: updated,
-        existing,
-        operation: existing ? "update" : "create",
-      });
-    }
-  }
+  const instructionsPath = resolve(baseDir, ".agsync", "instructions.md");
+  const userInstructions = await readFileOrEmpty(instructionsPath);
+  const agentsMdPath = resolve(targetDir, "AGENTS.md");
+  const agentsMdContent = buildAgentsMd(userInstructions, resolvedSkills);
+  const existingAgentsMd = await readFileOrEmpty(agentsMdPath);
+  plannedFiles.push({
+    path: agentsMdPath,
+    content: agentsMdContent,
+    existing: existingAgentsMd,
+    operation: !existingAgentsMd ? "create" : agentsMdContent !== existingAgentsMd ? "update" : "unchanged",
+  });
 
-  for (const converter of converters) {
-    const output = converter.convert(config, targetDir);
-    for (const file of output.files) {
-      const existing = await readFileOrEmpty(file.path);
-      let content = file.content;
-
-      if (file.path.endsWith(".json") && existing) {
-        content = mergeJsonContent(existing, file.content);
-      }
-
-      plannedFiles.push({
-        path: file.path,
-        content,
-        existing,
-        operation: !existing ? "create" : content !== existing ? "update" : "unchanged",
-      });
-    }
+  for (const [agentName, agentCfg] of Object.entries(agents)) {
+    planAgentFeatures(agentName, agentCfg, targetDir, agentsMdPath, canonicalSkillsDir, canonicalCommandsDir, tools, plannedFiles);
   }
 
   return { skills: plannedSkills, files: plannedFiles, skillOutputDirs, canonicalSkillsDir: skillsDir, warnings };
+}
+
+function planAgentFeatures(
+  _agentName: string,
+  config: AgentConfig,
+  targetDir: string,
+  agentsMdPath: string,
+  canonicalSkillsDir: string,
+  canonicalCommandsDir: string,
+  tools: ToolDefinition[],
+  files: PlannedFile[]
+): void {
+  if (config.instructions?.enabled) {
+    const dest = resolve(targetDir, config.instructions.destination);
+    if (dest !== agentsMdPath) {
+      const symlinkTarget = relative(dirname(dest), agentsMdPath);
+      files.push({
+        path: dest,
+        content: "",
+        existing: "",
+        operation: "create",
+        symlink: symlinkTarget,
+      });
+    }
+  }
+
+  if (config.skills?.enabled) {
+    const dest = resolve(targetDir, config.skills.destination);
+    if (dest !== canonicalSkillsDir) {
+      const symlinkTarget = relative(dirname(dest), canonicalSkillsDir);
+      files.push({
+        path: dest,
+        content: "",
+        existing: "",
+        operation: "create",
+        symlink: symlinkTarget,
+      });
+    }
+  }
+
+  if (config.commands?.enabled) {
+    const dest = resolve(targetDir, config.commands.destination);
+    if (dest !== canonicalCommandsDir) {
+      const symlinkTarget = relative(dirname(dest), canonicalCommandsDir);
+      files.push({
+        path: dest,
+        content: "",
+        existing: "",
+        operation: "create",
+        symlink: symlinkTarget,
+      });
+    }
+  }
+
+  if (config.mcp?.enabled) {
+    const mcpConfig = config.mcp as AgentMcpFeatureConfig;
+    const dest = resolve(targetDir, mcpConfig.destination);
+    const mcpTools = tools.filter((t) => t.type === "mcp");
+    if (mcpTools.length > 0) {
+      const servers = buildMcpServersObject(mcpTools);
+      const { format, root_key } = mcpConfig.mcp_format;
+      const content = format === "toml"
+        ? serializeMcpToml(root_key, servers)
+        : serializeMcpJson(root_key, servers);
+
+      files.push({
+        path: dest,
+        content,
+        existing: "",
+        operation: "create",
+      });
+    }
+  }
 }
 
 async function copyDirRecursive(
@@ -281,9 +365,9 @@ async function copySupportingFiles(plan: SyncPlan): Promise<string[]> {
       continue;
     }
 
-    const skipFiles = new Set([`${skillName}.yaml`]);
-    const targetDir = resolve(canonicalOutputDir, skillName);
-    const files = await copyDirRecursive(sourceDir, targetDir, skipFiles);
+    const skipFiles = new Set(["SKILL.md", `${skillName}.yaml`]);
+    const targetOutputDir = resolve(canonicalOutputDir, skillName);
+    const files = await copyDirRecursive(sourceDir, targetOutputDir, skipFiles);
     copied.push(...files);
   }
 
@@ -294,6 +378,8 @@ async function ensureSymlink(linkPath: string, target: string): Promise<void> {
   try {
     const s = await lstat(linkPath);
     if (s.isSymbolicLink()) {
+      const existingTarget = await readlink(linkPath);
+      if (existingTarget === target) return;
       await rm(linkPath);
     } else {
       await rm(linkPath, { recursive: true, force: true });
@@ -302,7 +388,28 @@ async function ensureSymlink(linkPath: string, target: string): Promise<void> {
     // path doesn't exist
   }
   await mkdir(dirname(linkPath), { recursive: true });
-  await symlink(target, linkPath, "dir");
+  const isFile = target.endsWith(".md") || target.endsWith(".json") || target.endsWith(".toml");
+  await symlink(target, linkPath, isFile ? "file" : "dir");
+}
+
+async function applyMcpFile(file: PlannedFile): Promise<void> {
+  const existing = await readFileOrEmpty(file.path);
+  let content = file.content;
+
+  if (existing && file.path.endsWith(".json")) {
+    try {
+      const parsed = JSON.parse(file.content);
+      const rootKey = Object.keys(parsed)[0];
+      if (rootKey) {
+        content = mergeJsonContent(existing, file.content, rootKey);
+      }
+    } catch {
+      // use incoming as-is
+    }
+  }
+
+  await mkdir(dirname(file.path), { recursive: true });
+  await writeFile(file.path, content, "utf-8");
 }
 
 async function applySyncPlan(plan: SyncPlan): Promise<string[]> {
@@ -315,7 +422,7 @@ async function applySyncPlan(plan: SyncPlan): Promise<string[]> {
 
   const written: string[] = [];
   for (const file of plan.files) {
-    if (file.operation === "delete") continue;
+    if (file.operation === "delete" || file.operation === "unchanged") continue;
 
     if (file.symlink) {
       await ensureSymlink(file.path, file.symlink);
@@ -323,8 +430,12 @@ async function applySyncPlan(plan: SyncPlan): Promise<string[]> {
       continue;
     }
 
-    await mkdir(dirname(file.path), { recursive: true });
-    await writeFile(file.path, file.content, "utf-8");
+    if (isMcpFile(file.path)) {
+      await applyMcpFile(file);
+    } else {
+      await mkdir(dirname(file.path), { recursive: true });
+      await writeFile(file.path, file.content, "utf-8");
+    }
     written.push(file.path);
   }
 
@@ -334,8 +445,136 @@ async function applySyncPlan(plan: SyncPlan): Promise<string[]> {
   return written;
 }
 
+function isMcpFile(path: string): boolean {
+  return path.endsWith("settings.json") ||
+    path.endsWith("mcp.json") ||
+    path.endsWith("mcp_config.json") ||
+    path.endsWith(".mcp.json") ||
+    path.endsWith("config.toml") ||
+    path.endsWith("opencode.json");
+}
+
+const GITIGNORE_BEGIN = "# agsync:begin";
+const GITIGNORE_END = "# agsync:end";
+
+function collectGitignoreEntries(
+  mode: GitignoreMode,
+  agents: ResolvedAgentConfig,
+  plan: SyncPlan
+): string[] {
+  if (mode === "off") return [];
+
+  if (mode === "mcpOnly") {
+    const entries: string[] = [];
+    for (const agentCfg of Object.values(agents)) {
+      if (agentCfg.mcp?.enabled) {
+        entries.push(agentCfg.mcp.destination);
+      }
+    }
+    return entries;
+  }
+
+  const entries = new Set<string>();
+  entries.add("AGENTS.md");
+  entries.add(".agents/");
+
+  for (const file of plan.files) {
+    if (file.symlink || isMcpFile(file.path)) {
+      const rel = relative(process.cwd(), file.path);
+      entries.add(rel.startsWith(".") ? rel : rel);
+    }
+  }
+
+  for (const agentCfg of Object.values(agents)) {
+    if (agentCfg.instructions?.enabled) entries.add(agentCfg.instructions.destination);
+    if (agentCfg.skills?.enabled) entries.add(agentCfg.skills.destination);
+    if (agentCfg.commands?.enabled) entries.add(agentCfg.commands.destination);
+    if (agentCfg.mcp?.enabled) entries.add(agentCfg.mcp.destination);
+  }
+
+  return [...entries].sort();
+}
+
+function updateGitignoreContent(existing: string, entries: string[]): string {
+  const beginIdx = existing.indexOf(GITIGNORE_BEGIN);
+  const endIdx = existing.indexOf(GITIGNORE_END);
+
+  const section = entries.length > 0
+    ? [GITIGNORE_BEGIN, ...entries, GITIGNORE_END].join("\n")
+    : "";
+
+  if (beginIdx !== -1 && endIdx !== -1) {
+    const before = existing.slice(0, beginIdx);
+    const after = existing.slice(endIdx + GITIGNORE_END.length);
+    if (!section) {
+      return (before + after).replace(/\n{3,}/g, "\n\n").trim() + "\n";
+    }
+    return before + section + after;
+  }
+
+  if (!section) return existing;
+
+  if (existing.length > 0 && !existing.endsWith("\n")) {
+    return existing + "\n\n" + section + "\n";
+  }
+  if (existing.length > 0) {
+    return existing + "\n" + section + "\n";
+  }
+  return section + "\n";
+}
+
+async function manageGitignore(
+  targetDir: string,
+  mode: GitignoreMode,
+  agents: ResolvedAgentConfig,
+  plan: SyncPlan
+): Promise<string | null> {
+  const entries = collectGitignoreEntries(mode, agents, plan);
+
+  if (mode === "off" && entries.length === 0) {
+    const gitignorePath = resolve(targetDir, ".gitignore");
+    const existing = await readFileOrEmpty(gitignorePath);
+    if (existing.includes(GITIGNORE_BEGIN)) {
+      const updated = updateGitignoreContent(existing, []);
+      await writeFile(gitignorePath, updated, "utf-8");
+      return gitignorePath;
+    }
+    return null;
+  }
+
+  if (entries.length === 0) return null;
+
+  const gitignorePath = resolve(targetDir, ".gitignore");
+  const existing = await readFileOrEmpty(gitignorePath);
+  const updated = updateGitignoreContent(existing, entries);
+
+  if (updated !== existing) {
+    await writeFile(gitignorePath, updated, "utf-8");
+    return gitignorePath;
+  }
+
+  return null;
+}
+
 export async function runSync(targetDir: string): Promise<{ written: string[]; warnings: string[] }> {
+  const loaded = await loadHierarchicalConfig(targetDir);
+  if (!loaded) {
+    throw new Error("No agsync.yaml found");
+  }
+
   const plan = await buildSyncPlan(targetDir);
   const written = await applySyncPlan(plan);
+
+  const agents = resolveAgentConfig(loaded.config.agents, loaded.config.features);
+  const gitignoreResult = await manageGitignore(
+    targetDir,
+    loaded.config.gitignore,
+    agents,
+    plan
+  );
+  if (gitignoreResult) {
+    written.push(gitignoreResult);
+  }
+
   return { written, warnings: plan.warnings };
 }

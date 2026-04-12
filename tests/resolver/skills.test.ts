@@ -8,6 +8,7 @@ import type { SkillDefinition } from "@/types";
 let tempDir: string;
 let skillsDir: string;
 let cacheDir: string;
+let originalFetch: typeof globalThis.fetch;
 
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), "agsync-resolver-"));
@@ -15,14 +16,20 @@ beforeEach(async () => {
   cacheDir = join(tempDir, ".agsync", "cache");
   await mkdir(skillsDir, { recursive: true });
   await mkdir(cacheDir, { recursive: true });
+  originalFetch = globalThis.fetch;
 });
 
 afterEach(async () => {
+  globalThis.fetch = originalFetch;
   await rm(tempDir, { recursive: true, force: true });
 });
 
+function rawGithubUrl(org: string, repo: string, path: string): string {
+  return `https://raw.githubusercontent.com/${org}/${repo}/main/${path}`;
+}
+
 describe("resolveAllSkills", () => {
-  it("resolves a skill with no extends", async () => {
+  it("resolves a skill with instructions and no extends", async () => {
     const skill: SkillDefinition = {
       name: "simple",
       description: "Simple skill",
@@ -38,7 +45,7 @@ describe("resolveAllSkills", () => {
     expect(result[0].extendsChain).toEqual(["simple"]);
   });
 
-  it("resolves local extends", async () => {
+  it("resolves local extends loaded from YAML on disk", async () => {
     const baseSkill = {
       name: "base",
       description: "Base skill",
@@ -64,7 +71,7 @@ describe("resolveAllSkills", () => {
     expect(result[0].tools).toContain("write");
   });
 
-  it("resolves multiple levels of extends", async () => {
+  it("resolves multiple levels of extends from YAML", async () => {
     const grandparent = {
       name: "grandparent",
       description: "GP",
@@ -150,5 +157,91 @@ describe("resolveAllSkills", () => {
     expect(grepCount).toBe(1);
     expect(result[0].tools).toContain("read");
     expect(result[0].tools).toContain("write");
+  });
+
+  it("resolves github extends using mocked raw fetches", async () => {
+    const extOrg = "ExtOrg";
+    const extRepo = "ExtRepo";
+    const extPath = "skills/parent.yaml";
+    const parentYaml = toYaml({
+      name: "parent",
+      description: "Parent from GitHub",
+      instructions: "Parent remote body",
+      tools: ["gh-tool"],
+    });
+
+    globalThis.fetch = jest.fn(async (url: string) => {
+      if (url === rawGithubUrl(extOrg, extRepo, extPath)) {
+        return { ok: true, text: async (): Promise<string> => parentYaml };
+      }
+      return { ok: false, status: 404, text: async (): Promise<string> => "not found" };
+    }) as unknown as typeof fetch;
+
+    const child: SkillDefinition = {
+      name: "child",
+      description: "Child",
+      extends: [`github:${extOrg}/${extRepo}/${extPath}`],
+      instructions: "Local overlay",
+      tools: ["local-tool"],
+    };
+
+    const result = await resolveAllSkills([child], skillsDir, cacheDir);
+    expect(result[0].name).toBe("child");
+    expect(result[0].instructions).toContain("Parent remote body");
+    expect(result[0].instructions).toContain("Local overlay");
+    expect(result[0].tools).toContain("gh-tool");
+    expect(result[0].tools).toContain("local-tool");
+  });
+
+  it("resolves source from GitHub SKILL.md with mocked API and raw fetches", async () => {
+    const org = "SourceOrg";
+    const repo = "SourceRepo";
+    const remotePath = "packs/gh-skill";
+    const apiDir = `https://api.github.com/repos/${org}/${repo}/contents/${remotePath}`;
+    const rawSkill = rawGithubUrl(org, repo, `${remotePath}/SKILL.md`);
+
+    const remoteSkillMd = `---
+name: gh-skill
+description: Loaded from GitHub
+---
+
+Body from **SKILL.md**
+`;
+
+    globalThis.fetch = jest.fn(async (url: string) => {
+      if (url === apiDir) {
+        return {
+          ok: true,
+          json: async (): Promise<unknown[]> => [
+            {
+              name: "SKILL.md",
+              path: `${remotePath}/SKILL.md`,
+              type: "file",
+              download_url: rawSkill,
+            },
+          ],
+        };
+      }
+      if (url === rawSkill) {
+        return { ok: true, text: async (): Promise<string> => remoteSkillMd };
+      }
+      return { ok: false, status: 404, text: async (): Promise<string> => "not found" };
+    }) as unknown as typeof fetch;
+
+    const entry: SkillDefinition = {
+      name: "gh-skill",
+      description: "Placeholder until fetch",
+      source: {
+        registry: "github",
+        org,
+        repo,
+        path: remotePath,
+      },
+    };
+
+    const result = await resolveAllSkills([entry], skillsDir, cacheDir);
+    expect(result[0].name).toBe("gh-skill");
+    expect(result[0].description).toBe("Loaded from GitHub");
+    expect(result[0].instructions).toContain("Body from **SKILL.md**");
   });
 });
