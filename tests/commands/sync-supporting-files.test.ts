@@ -50,6 +50,7 @@ source:
   org: ${ORG}
   repo: ${REPO}
   path: ${REMOTE_PATH}
+  version: "v1.0.0"
 license: MIT
 ---
 
@@ -131,6 +132,10 @@ function mockScriptsListing() {
 
 function createMockFetch() {
   return jest.fn(async (url: string) => {
+    if (url.includes(`/repos/${ORG}/${REPO}/commits/v1.0.0`)) {
+      return { ok: true, json: async () => ({ sha: "abc123def456" }) };
+    }
+
     if (url === `${API_BASE}/${REMOTE_PATH}`) {
       return { ok: true, json: async () => mockDirectoryListing() };
     }

@@ -1,5 +1,7 @@
+import { dirname } from "node:path";
 import { loadHierarchicalConfig } from "@/loader/hierarchy";
 import { findEnvReferences } from "@/utils/env";
+import { readLockFile } from "@/lock/lock";
 import type { ValidationError, LoadedConfig } from "@/types";
 
 function validateSkillCompleteness(loaded: LoadedConfig): ValidationError[] {
@@ -86,6 +88,55 @@ function validateEnvReferences(loaded: LoadedConfig): ValidationError[] {
   return warnings;
 }
 
+function validateExternalVersions(loaded: LoadedConfig): ValidationError[] {
+  const errors: ValidationError[] = [];
+  for (const skill of loaded.skills) {
+    if (skill.source && !skill.source.version) {
+      errors.push({
+        file: `skill: ${skill.name}`,
+        message: `External skill source requires a "version" field`,
+      });
+    }
+  }
+  return errors;
+}
+
+function validateExtendsVersions(loaded: LoadedConfig): ValidationError[] {
+  const warnings: ValidationError[] = [];
+  for (const skill of loaded.skills) {
+    for (const ref of skill.extends ?? []) {
+      if ((ref.startsWith("github:") || ref.startsWith("clawhub:")) && !ref.includes("@")) {
+        warnings.push({
+          file: `skill: ${skill.name}`,
+          message: `Extends ref "${ref}" should include @version (e.g. "${ref}@v1.0.0")`,
+          severity: "warn",
+        });
+      }
+    }
+  }
+  return warnings;
+}
+
+async function validateLockStaleness(loaded: LoadedConfig): Promise<ValidationError[]> {
+  const warnings: ValidationError[] = [];
+  const lock = await readLockFile(dirname(loaded.configPath));
+  if (!lock) return warnings;
+
+  for (const skill of loaded.skills) {
+    if (!skill.source) continue;
+    const entry = lock.sources[skill.name];
+    if (entry && entry.version !== skill.source.version) {
+      warnings.push({
+        file: `skill: ${skill.name}`,
+        message: `Lock file version "${entry.version}" differs from source version "${skill.source.version}"`,
+        severity: "warn",
+      });
+    }
+  }
+
+  return warnings;
+}
+
 export async function runValidate(targetDir: string): Promise<ValidationError[]> {
   const loaded = await loadHierarchicalConfig(targetDir);
 
@@ -99,6 +150,9 @@ export async function runValidate(targetDir: string): Promise<ValidationError[]>
   errors.push(...validateCrossReferences(loaded));
   errors.push(...validateCommands(loaded));
   errors.push(...validateEnvReferences(loaded));
+  errors.push(...validateExternalVersions(loaded));
+  errors.push(...validateExtendsVersions(loaded));
+  errors.push(...(await validateLockStaleness(loaded)));
 
   return errors;
 }

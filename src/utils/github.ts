@@ -2,18 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { skillMdFrontmatterSchema } from "@/schema/config";
-
-export interface GitHubContentEntry {
-  name: string;
-  path: string;
-  type: "file" | "dir";
-  download_url: string | null;
-}
-
-export interface GitHubSearchResult {
-  total_count: number;
-  items: { name: string; path: string; repository: { full_name: string } }[];
-}
+import type { GitHubContentEntry, GitHubSearchResult } from "@/types";
 
 export async function fetchGitHubDirectory(
   org: string,
@@ -153,7 +142,7 @@ export function parseSkillMd(raw: string): {
   instructions: string;
   extends?: string[];
   tools?: string[];
-  source?: { registry: string; org: string; repo: string; path: string; ref?: string };
+  source?: import("@/types").SkillSource;
 } {
   const frontmatterMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!frontmatterMatch) {
@@ -169,6 +158,6 @@ export function parseSkillMd(raw: string): {
     instructions: body,
     extends: frontmatter.extends,
     tools: frontmatter.tools,
-    source: frontmatter.source,
+    source: frontmatter.source as import("@/types").SkillSource | undefined,
   };
 }

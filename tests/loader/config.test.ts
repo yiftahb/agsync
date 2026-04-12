@@ -168,6 +168,7 @@ describe("loadFullConfig", () => {
             org: "test-org",
             repo: "test-repo",
             path: "skills/sourced",
+            version: "v1.0.0",
           },
         },
         "Instructions body"
@@ -181,7 +182,11 @@ describe("loadFullConfig", () => {
 
     const result = await loadFullConfig(join(tempDir, "agsync.yaml"));
     expect(result.skills[0].source).toBeDefined();
-    expect(result.skills[0].source!.org).toBe("test-org");
+    const src = result.skills[0].source!;
+    expect(src.registry).toBe("github");
+    if (src.registry === "github") {
+      expect(src.org).toBe("test-org");
+    }
     expect(result.skills[0].extends).toEqual(["base-skill"]);
     expect(result.skills[0].tools).toEqual(["test-tool"]);
     expect(result.skills[0].instructions).toBe("Instructions body");

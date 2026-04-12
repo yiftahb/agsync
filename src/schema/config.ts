@@ -10,13 +10,24 @@ export const toolDefinitionSchema = z.object({
   env: z.record(z.string()).optional(),
 });
 
-export const skillSourceSchema = z.object({
-  registry: z.string().min(1),
+export const githubSourceSchema = z.object({
+  registry: z.literal("github"),
   org: z.string().min(1),
   repo: z.string().min(1),
   path: z.string().min(1),
-  ref: z.string().optional(),
+  version: z.string().min(1),
 });
+
+export const clawhubSourceSchema = z.object({
+  registry: z.literal("clawhub"),
+  slug: z.string().min(1),
+  version: z.string().min(1),
+});
+
+export const skillSourceSchema = z.discriminatedUnion("registry", [
+  githubSourceSchema,
+  clawhubSourceSchema,
+]);
 
 export const skillDefinitionSchema = z.object({
   name: z.string().min(1),

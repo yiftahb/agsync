@@ -12,7 +12,10 @@ GETTING STARTED
   agsync sync                             Generate output for all enabled agents
 
 MANAGING SKILLS
-  agsync skill add <org/repo> <name>      Import a skill from a GitHub repository
+  agsync skill add <org/repo> <name>      Import a skill from GitHub
+  agsync skill add <org/repo> <name@ver>  Import at a specific version
+  agsync skill add clawhub:<slug>         Import a skill from ClawHub
+  agsync skill add clawhub:<slug@ver>     Import at a specific ClawHub version
   agsync skill remove <name>              Remove a skill from .agsync/skills/
 
 MAINTENANCE
@@ -65,7 +68,7 @@ SKILL FORMAT
 
     Detailed instructions for the agent.
 
-  Imported skill (stub with source):
+  Imported skill from GitHub:
     ---
     name: my-skill
     description: What this skill does
@@ -74,7 +77,37 @@ SKILL FORMAT
       org: org-name
       repo: repo-name
       path: path/to/skill
+      version: "v1.2.0"
     ---
+
+  Imported skill from ClawHub:
+    ---
+    name: my-skill
+    description: What this skill does
+    source:
+      registry: clawhub
+      slug: author/skill-name
+      version: "3.0.0"
+    ---
+
+VERSION LOCKING
+  External skills are pinned to exact versions via the source.version field.
+  A lock file (agsync-lock.yaml) records the resolved commit/version and a
+  content hash for each external dependency.
+
+  Lock file sections:
+    sources:     Skills fetched via source: in SKILL.md
+    extends:     Skills fetched via extends: refs
+
+  The --frozen flag (sync, plan) enforces the lock file:
+    agsync sync --frozen        Fail if lock is missing or stale
+    agsync plan --frozen        Same check without writing files
+
+  On GitHub, version can be a tag (v1.2.0), commit SHA, or branch name.
+  On ClawHub, version is always semver.
+
+  The lock file is auto-generated on first sync and updated on each sync.
+  Extends refs must include @version: github:org/repo/path@v1.0.0
 
 COMMAND FORMAT
   Commands are .md files under .agsync/commands/:

@@ -9,10 +9,11 @@ import { resolveAllSkills } from "@/resolver/skills";
 import { resolveAgentConfig } from "@/agents/registry";
 import { runValidate } from "@/commands/validate";
 import { expandToolEnv } from "@/utils/env";
+import { readLockFile, writeLockFile } from "@/lock/lock";
 import type {
   ResolvedSkill, SyncPlan, PlannedFile, PlannedSkill,
   ToolDefinition, AgentConfig, AgentMcpFeatureConfig, CommandDefinition,
-  GitignoreMode, ResolvedAgentConfig,
+  GitignoreMode, ResolvedAgentConfig, LockFile,
 } from "@/types";
 
 const MANAGED_HEADER = [
@@ -181,7 +182,7 @@ async function listSubdirectories(dir: string): Promise<string[]> {
 
 export async function buildSyncPlan(
   targetDir: string,
-  options?: { expandEnv?: boolean }
+  options?: { expandEnv?: boolean; frozen?: boolean }
 ): Promise<SyncPlan> {
   const allErrors = await runValidate(targetDir);
   const hardErrors = allErrors.filter((e) => e.severity !== "warn");
@@ -196,9 +197,17 @@ export async function buildSyncPlan(
   }
 
   const baseDir = dirname(loaded.configPath);
+  const frozen = options?.frozen ?? false;
+  const lock = await readLockFile(baseDir);
+
+  if (frozen && !lock) {
+    throw new Error("--frozen: agsync-lock.yaml not found");
+  }
+
   const skillsDir = resolve(baseDir, ".agsync", "skills");
   const cacheDir = resolve(baseDir, ".agsync", "cache");
-  const resolvedSkills = await resolveAllSkills(loaded.skills, skillsDir, cacheDir);
+  const resolveResult = await resolveAllSkills(loaded.skills, skillsDir, cacheDir, { lock, frozen });
+  const resolvedSkills = resolveResult.skills;
 
   let tools = loaded.tools;
   const warnings: string[] = [];
@@ -283,7 +292,14 @@ export async function buildSyncPlan(
     planAgentFeatures(agentName, agentCfg, gitRoot, agentsMdPath, canonicalSkillsDir, canonicalCommandsDir, tools, plannedFiles);
   }
 
-  return { skills: plannedSkills, files: plannedFiles, skillOutputDirs, canonicalSkillsDir: skillsDir, warnings };
+  return {
+    skills: plannedSkills,
+    files: plannedFiles,
+    skillOutputDirs,
+    canonicalSkillsDir: skillsDir,
+    warnings,
+    lockUpdates: resolveResult.lockUpdates,
+  };
 }
 
 function planAgentFeatures(
@@ -600,14 +616,33 @@ async function manageGitignore(
   return null;
 }
 
-export async function runSync(targetDir: string): Promise<{ written: string[]; warnings: string[] }> {
+export async function runSync(
+  targetDir: string,
+  options?: { frozen?: boolean }
+): Promise<{ written: string[]; warnings: string[] }> {
   const loaded = await loadHierarchicalConfig(targetDir);
   if (!loaded) {
     throw new Error("No agsync.yaml found");
   }
 
-  const plan = await buildSyncPlan(targetDir);
+  const frozen = options?.frozen ?? false;
+  const plan = await buildSyncPlan(targetDir, { frozen });
   const written = await applySyncPlan(plan);
+
+  if (!frozen && plan.lockUpdates) {
+    const baseDir = dirname(loaded.configPath);
+    const existingLock = await readLockFile(baseDir);
+    const newLock: LockFile = {
+      lockVersion: 1,
+      sources: { ...(existingLock?.sources ?? {}), ...plan.lockUpdates.sources },
+      extends: { ...(existingLock?.extends ?? {}), ...plan.lockUpdates.extends },
+    };
+    const hasEntries = Object.keys(newLock.sources).length > 0 || Object.keys(newLock.extends).length > 0;
+    if (hasEntries) {
+      const lockPath = await writeLockFile(baseDir, newLock);
+      written.push(lockPath);
+    }
+  }
 
   const agents = resolveAgentConfig(loaded.config.agents, loaded.config.features);
   const gitignoreResult = await manageGitignore(

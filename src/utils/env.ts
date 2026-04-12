@@ -1,12 +1,6 @@
-import type { ToolDefinition } from "@/types";
+import type { ToolDefinition, EnvWarning, EnvReference } from "@/types";
 
 const ENV_VAR_REGEX = /\$\{([^}]+)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g;
-
-export interface EnvWarning {
-  tool: string;
-  key: string;
-  varName: string;
-}
 
 export function expandEnvValue(value: string): { result: string; missing: string[] } {
   if (!value.includes("$")) return { result: value, missing: [] };
@@ -47,12 +41,6 @@ export function expandToolEnv(tools: ToolDefinition[]): {
   });
 
   return { tools: expanded, warnings };
-}
-
-export interface EnvReference {
-  tool: string;
-  key: string;
-  varName: string;
 }
 
 export function findEnvReferences(tools: ToolDefinition[]): EnvReference[] {

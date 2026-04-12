@@ -59,6 +59,9 @@ export function formatPlan(plan: SyncPlan, baseDir: string): string {
   return lines.join("\n");
 }
 
-export async function runPlan(targetDir: string): Promise<SyncPlan> {
-  return buildSyncPlan(targetDir, { expandEnv: false });
+export async function runPlan(
+  targetDir: string,
+  options?: { frozen?: boolean }
+): Promise<SyncPlan> {
+  return buildSyncPlan(targetDir, { expandEnv: false, frozen: options?.frozen });
 }

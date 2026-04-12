@@ -1,3 +1,11 @@
+import type {
+  LockEntry as _LockEntry,
+  LockFile as _LockFile,
+} from "@/lock/schema";
+
+export type LockEntry = _LockEntry;
+export type LockFile = _LockFile;
+
 export type McpSerializationFormat = "json" | "toml";
 
 export interface McpFormat {
@@ -52,13 +60,21 @@ export interface ToolDefinition {
   env?: Record<string, string>;
 }
 
-export interface SkillSource {
-  registry: string;
+export interface GitHubSource {
+  registry: "github";
   org: string;
   repo: string;
   path: string;
-  ref?: string;
+  version: string;
 }
+
+export interface ClawHubSource {
+  registry: "clawhub";
+  slug: string;
+  version: string;
+}
+
+export type SkillSource = GitHubSource | ClawHubSource;
 
 export interface SkillDefinition {
   name: string;
@@ -151,12 +167,26 @@ export interface PlannedFile {
   symlink?: string;
 }
 
+export interface LockUpdateEntry {
+  registry: string;
+  version: string;
+  resolved: string;
+  integrity: string;
+  fetchedAt: string;
+}
+
+export interface LockUpdates {
+  sources: Record<string, LockUpdateEntry>;
+  extends: Record<string, LockUpdateEntry>;
+}
+
 export interface SyncPlan {
   skills: PlannedSkill[];
   files: PlannedFile[];
   skillOutputDirs: string[];
   canonicalSkillsDir: string;
   warnings: string[];
+  lockUpdates?: LockUpdates;
 }
 
 export interface DoctorCheck {
@@ -170,3 +200,53 @@ export interface ValidationError {
   message: string;
   severity?: "error" | "warn";
 }
+
+export interface FetchedSkill {
+  skillMd: string;
+  supportingFiles: { path: string; content: string }[];
+  resolvedVersion: string;
+  integrity: string;
+}
+
+export type PartialSkillSource = Record<string, unknown> & { registry: string; version?: string };
+
+export interface SkillRegistry {
+  name: string;
+  fetch(source: SkillSource, cacheDir: string): Promise<FetchedSkill>;
+  resolveLatest(source: PartialSkillSource): Promise<string>;
+}
+
+export interface ResolveOptions {
+  lock?: LockFile | null;
+  frozen?: boolean;
+}
+
+export interface ResolveResult {
+  skills: ResolvedSkill[];
+  lockUpdates: { sources: Record<string, LockEntry>; extends: Record<string, LockEntry> };
+}
+
+export interface GitHubContentEntry {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+  download_url: string | null;
+}
+
+export interface GitHubSearchResult {
+  total_count: number;
+  items: { name: string; path: string; repository: { full_name: string } }[];
+}
+
+export interface EnvWarning {
+  tool: string;
+  key: string;
+  varName: string;
+}
+
+export interface EnvReference {
+  tool: string;
+  key: string;
+  varName: string;
+}
+

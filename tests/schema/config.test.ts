@@ -115,15 +115,43 @@ describe("agsyncConfigSchema", () => {
 });
 
 describe("skillSourceSchema", () => {
-  it("parses required fields and optional ref", () => {
+  it("parses a github source with version", () => {
     const result = skillSourceSchema.parse({
       registry: "github",
       org: "acme",
       repo: "skills",
       path: "pack/reviewer",
-      ref: "main",
+      version: "v1.0.0",
     });
-    expect(result.ref).toBe("main");
+    expect(result.registry).toBe("github");
+    if (result.registry === "github") {
+      expect(result.org).toBe("acme");
+      expect(result.version).toBe("v1.0.0");
+    }
+  });
+
+  it("parses a clawhub source with version", () => {
+    const result = skillSourceSchema.parse({
+      registry: "clawhub",
+      slug: "author/skill",
+      version: "3.0.0",
+    });
+    expect(result.registry).toBe("clawhub");
+    if (result.registry === "clawhub") {
+      expect(result.slug).toBe("author/skill");
+      expect(result.version).toBe("3.0.0");
+    }
+  });
+
+  it("rejects source without version", () => {
+    expect(() =>
+      skillSourceSchema.parse({
+        registry: "github",
+        org: "acme",
+        repo: "skills",
+        path: "pack/reviewer",
+      })
+    ).toThrow();
   });
 });
 
@@ -143,15 +171,18 @@ describe("skillMdFrontmatterSchema", () => {
     const result = skillMdFrontmatterSchema.parse({
       name: "imported",
       description: "Remote skill",
-      extends: ["./base", "github:org/repo"],
+      extends: ["./base", "github:org/repo@v1"],
       tools: ["grep", "read_file"],
-      source: { registry: "github", org: "o", repo: "r", path: "s" },
+      source: { registry: "github", org: "o", repo: "r", path: "s", version: "v1.0.0" },
       license: "MIT",
       metadata: { author: "me", version: "1.0.0", extra: true },
     });
-    expect(result.extends).toEqual(["./base", "github:org/repo"]);
+    expect(result.extends).toEqual(["./base", "github:org/repo@v1"]);
     expect(result.tools).toEqual(["grep", "read_file"]);
-    expect(result.source?.repo).toBe("r");
+    expect(result.source?.registry).toBe("github");
+    if (result.source?.registry === "github") {
+      expect(result.source.repo).toBe("r");
+    }
     expect(result.metadata).toMatchObject({ author: "me", extra: true });
   });
 });
@@ -186,10 +217,13 @@ describe("skillDefinitionSchema", () => {
       name: "imported",
       description: "Imported skill",
       instructions: "Do things",
-      source: { registry: "github", org: "org", repo: "repo", path: "skills/imported" },
+      source: { registry: "github", org: "org", repo: "repo", path: "skills/imported", version: "v1.0.0" },
     };
     const result = skillDefinitionSchema.parse(input);
-    expect(result.source?.org).toBe("org");
+    expect(result.source?.registry).toBe("github");
+    if (result.source?.registry === "github") {
+      expect(result.source.org).toBe("org");
+    }
   });
 
   it("accepts a skill without instructions", () => {

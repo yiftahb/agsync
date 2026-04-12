@@ -69,9 +69,10 @@ program
   .command("plan")
   .description("Preview changes without writing files")
   .option("-d, --dir <path>", "Target directory", process.cwd())
+  .option("--frozen", "Fail if lock file is missing or stale")
   .action(async (opts) => {
     try {
-      const plan = await runPlan(opts.dir);
+      const plan = await runPlan(opts.dir, { frozen: opts.frozen });
       console.log(formatPlan(plan, opts.dir));
     } catch (err: unknown) {
       console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -83,9 +84,10 @@ program
   .command("sync")
   .description("Compile and generate client configs")
   .option("-d, --dir <path>", "Target directory", process.cwd())
+  .option("--frozen", "Fail if lock file is missing or stale")
   .action(async (opts) => {
     try {
-      const { written, warnings } = await runSync(opts.dir);
+      const { written, warnings } = await runSync(opts.dir, { frozen: opts.frozen });
       if (warnings.length > 0) {
         console.warn("Warnings:");
         for (const w of warnings) {
@@ -123,13 +125,13 @@ const skill = program
   .description("Manage skills");
 
 skill
-  .command("add <repo> <skill-name>")
-  .description("Add a skill from a GitHub repository")
+  .command("add <source> [skill-name]")
+  .description("Add a skill from GitHub or ClawHub")
   .option("-d, --dir <path>", "Target directory", process.cwd())
-  .action(async (repo: string, skillName: string, opts: { dir: string }) => {
+  .action(async (source: string, skillName: string | undefined, opts: { dir: string }) => {
     try {
-      const files = await runAdd(opts.dir, repo, skillName);
-      console.log(`Added skill "${skillName}" from ${repo}:`);
+      const files = await runAdd(opts.dir, source, skillName ?? "");
+      console.log(`Added skill from ${source}:`);
       for (const file of files) {
         console.log(`  + ${file}`);
       }

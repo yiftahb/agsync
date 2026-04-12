@@ -1,64 +1,64 @@
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
-import { existsSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import { skillDefinitionSchema } from "@/schema/config";
-import {
-  fetchGitHubDirectory,
-  fetchFileContent,
-  downloadSupportingFiles,
-  parseSkillMd,
-} from "@/utils/github";
-import type { SkillDefinition, ResolvedSkill } from "@/types";
+import { parseSkillMd } from "@/utils/github";
+import { getRegistry } from "@/registries/index";
+import type {
+  SkillDefinition, ResolvedSkill, SkillSource, GitHubSource, ClawHubSource,
+  LockFile, LockEntry, ResolveOptions, ResolveResult,
+} from "@/types";
 
 const GITHUB_PREFIX = "github:";
+const CLAWHUB_PREFIX = "clawhub:";
 const LOCAL_PREFIX = "./";
 
-function isGithubRef(ref: string): boolean {
-  return ref.startsWith(GITHUB_PREFIX);
+function isExternalRef(ref: string): boolean {
+  return ref.startsWith(GITHUB_PREFIX) || ref.startsWith(CLAWHUB_PREFIX);
 }
 
 function isLocalRef(ref: string): boolean {
   return ref.startsWith(LOCAL_PREFIX) || ref.startsWith("../");
 }
 
-function parseGithubRef(ref: string): { org: string; repo: string; path: string } {
-  const stripped = ref.slice(GITHUB_PREFIX.length);
-  const parts = stripped.split("/");
+function parseExternalRef(ref: string): { source: SkillSource; rawRef: string } {
+  if (ref.startsWith(CLAWHUB_PREFIX)) {
+    const rest = ref.slice(CLAWHUB_PREFIX.length);
+    const atIdx = rest.lastIndexOf("@");
+    if (atIdx === -1) {
+      throw new Error(`ClawHub extends ref "${ref}" must include @version`);
+    }
+    const slug = rest.slice(0, atIdx);
+    const version = rest.slice(atIdx + 1);
+    return {
+      source: { registry: "clawhub", slug, version } as ClawHubSource,
+      rawRef: ref,
+    };
+  }
+
+  const stripped = ref.startsWith(GITHUB_PREFIX) ? ref.slice(GITHUB_PREFIX.length) : ref;
+  const atIdx = stripped.lastIndexOf("@");
+  if (atIdx === -1) {
+    throw new Error(`GitHub extends ref "${ref}" must include @version`);
+  }
+  const pathPart = stripped.slice(0, atIdx);
+  const version = stripped.slice(atIdx + 1);
+  const parts = pathPart.split("/");
   const org = parts[0];
   const repo = parts[1];
   const path = parts.slice(2).join("/") || "skill.yaml";
-  return { org, repo, path };
+  return {
+    source: { registry: "github", org, repo, path, version } as GitHubSource,
+    rawRef: ref,
+  };
 }
 
-function getCachePath(cacheDir: string, org: string, repo: string, path: string): string {
-  return resolve(cacheDir, org, repo, path);
-}
-
-async function fetchGithubSkill(
-  ref: string,
-  cacheDir: string
-): Promise<SkillDefinition> {
-  const { org, repo, path } = parseGithubRef(ref);
-  const cached = getCachePath(cacheDir, org, repo, path);
-
-  if (existsSync(cached)) {
-    const raw = await readFile(cached, "utf-8");
-    return skillDefinitionSchema.parse(parseYaml(raw));
-  }
-
-  const url = `https://raw.githubusercontent.com/${org}/${repo}/main/${path}`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch skill from ${url}: ${response.status}`);
-  }
-
-  const content = await response.text();
-  await mkdir(dirname(cached), { recursive: true });
-  await writeFile(cached, content, "utf-8");
-
-  return skillDefinitionSchema.parse(parseYaml(content));
+interface ResolveContext {
+  skillsDir: string;
+  cacheDir: string;
+  lock: LockFile | null;
+  frozen: boolean;
+  lockUpdates: { sources: Record<string, LockEntry>; extends: Record<string, LockEntry> };
 }
 
 async function loadLocalSkill(
@@ -70,48 +70,103 @@ async function loadLocalSkill(
   return skillDefinitionSchema.parse(parseYaml(raw));
 }
 
+async function fetchExternalSkill(
+  ref: string,
+  ctx: ResolveContext
+): Promise<SkillDefinition> {
+  const { source, rawRef } = parseExternalRef(ref);
+  const registry = getRegistry(source.registry);
+
+  if (ctx.frozen) {
+    if (!ctx.lock) {
+      throw new Error("--frozen: no lock file found");
+    }
+    const entry = ctx.lock.extends[rawRef];
+    if (!entry || entry.version !== source.version) {
+      throw new Error(`--frozen: extends ref "${rawRef}" is not locked or version mismatch`);
+    }
+  }
+
+  const fetched = await registry.fetch(source, ctx.cacheDir);
+  const parsed = parseSkillMd(fetched.skillMd);
+
+  ctx.lockUpdates.extends[rawRef] = {
+    registry: source.registry,
+    version: source.version,
+    resolved: fetched.resolvedVersion,
+    integrity: fetched.integrity,
+    fetchedAt: new Date().toISOString(),
+  };
+
+  return {
+    name: parsed.name,
+    description: parsed.description,
+    instructions: parsed.instructions || undefined,
+    extends: parsed.extends,
+    tools: parsed.tools,
+    source: parsed.source,
+  };
+}
+
 async function loadExtendedSkill(
   ref: string,
-  skillsDir: string,
-  cacheDir: string
+  ctx: ResolveContext
 ): Promise<SkillDefinition> {
-  if (isGithubRef(ref)) {
-    return fetchGithubSkill(ref, cacheDir);
+  if (isExternalRef(ref)) {
+    return fetchExternalSkill(ref, ctx);
   }
   if (isLocalRef(ref)) {
-    return loadLocalSkill(ref, skillsDir);
+    return loadLocalSkill(ref, ctx.skillsDir);
   }
   throw new Error(`Unknown skill reference format: ${ref}`);
 }
 
 async function resolveSourceSkill(
   skill: SkillDefinition,
-  skillsDir: string
+  ctx: ResolveContext
 ): Promise<{ instructions: string; description: string }> {
   if (!skill.source) {
     throw new Error(`Skill "${skill.name}" has no source to resolve`);
   }
 
-  const { org, repo, path: remotePath } = skill.source;
-  const localDir = resolve(skillsDir, skill.name);
+  const registry = getRegistry(skill.source.registry);
 
-  const entries = await fetchGitHubDirectory(org, repo, remotePath);
-  const skillMdEntry = entries.find((e) => e.name === "SKILL.md");
+  if (ctx.frozen) {
+    if (!ctx.lock) {
+      throw new Error("--frozen: no lock file found");
+    }
+    const entry = ctx.lock.sources[skill.name];
+    if (!entry || entry.version !== skill.source.version) {
+      throw new Error(`--frozen: source "${skill.name}" is not locked or version mismatch`);
+    }
+  }
+
+  const fetched = await registry.fetch(skill.source, ctx.cacheDir);
+
+  ctx.lockUpdates.sources[skill.name] = {
+    registry: skill.source.registry,
+    version: skill.source.version,
+    resolved: fetched.resolvedVersion,
+    integrity: fetched.integrity,
+    fetchedAt: new Date().toISOString(),
+  };
 
   let remoteInstructions = "";
   let remoteDescription = skill.description;
 
-  if (skillMdEntry && skillMdEntry.download_url) {
-    const content = await fetchFileContent(skillMdEntry.download_url);
-    const parsed = parseSkillMd(content);
+  if (fetched.skillMd) {
+    const parsed = parseSkillMd(fetched.skillMd);
     remoteInstructions = parsed.instructions;
     remoteDescription = parsed.description || skill.description;
   }
 
-  await downloadSupportingFiles(org, repo, remotePath, localDir, [
-    "SKILL.md",
-    `${skill.name}.yaml`,
-  ]);
+  const localDir = resolve(ctx.skillsDir, skill.name);
+  await mkdir(localDir, { recursive: true });
+  for (const file of fetched.supportingFiles) {
+    const filePath = resolve(localDir, file.path);
+    await mkdir(dirname(filePath), { recursive: true });
+    await writeFile(filePath, file.content, "utf-8");
+  }
 
   return { instructions: remoteInstructions, description: remoteDescription };
 }
@@ -137,8 +192,7 @@ function detectCircularExtends(
 
 async function resolveSkillChain(
   skill: SkillDefinition,
-  skillsDir: string,
-  cacheDir: string,
+  ctx: ResolveContext,
   visited: Set<string>
 ): Promise<ResolvedSkill> {
   detectCircularExtends(skill.name, visited);
@@ -148,7 +202,7 @@ async function resolveSkillChain(
   let effectiveDescription = skill.description;
 
   if (skill.source) {
-    const remote = await resolveSourceSkill(skill, skillsDir);
+    const remote = await resolveSourceSkill(skill, ctx);
     if (skill.instructions) {
       effectiveInstructions = [remote.instructions, skill.instructions]
         .filter(Boolean)
@@ -180,8 +234,8 @@ async function resolveSkillChain(
   };
 
   for (const ref of skill.extends) {
-    const baseSkill = await loadExtendedSkill(ref, skillsDir, cacheDir);
-    const resolvedBase = await resolveSkillChain(baseSkill, skillsDir, cacheDir, new Set(visited));
+    const baseSkill = await loadExtendedSkill(ref, ctx);
+    const resolvedBase = await resolveSkillChain(baseSkill, ctx, new Set(visited));
     resolved = {
       ...resolved,
       instructions: [resolved.instructions, resolvedBase.instructions]
@@ -204,14 +258,24 @@ async function resolveSkillChain(
 export async function resolveAllSkills(
   skills: SkillDefinition[],
   skillsDir: string,
-  cacheDir: string
-): Promise<ResolvedSkill[]> {
+  cacheDir: string,
+  options?: ResolveOptions
+): Promise<ResolveResult> {
+  const ctx: ResolveContext = {
+    skillsDir,
+    cacheDir,
+    lock: options?.lock ?? null,
+    frozen: options?.frozen ?? false,
+    lockUpdates: { sources: {}, extends: {} },
+  };
+
   const resolved: ResolvedSkill[] = [];
   for (const skill of skills) {
-    const result = await resolveSkillChain(skill, skillsDir, cacheDir, new Set());
+    const result = await resolveSkillChain(skill, ctx, new Set());
     if (skill.scope) result.scope = skill.scope;
     if (skill.sourceDir) result.sourceDir = skill.sourceDir;
     resolved.push(result);
   }
-  return resolved;
+
+  return { skills: resolved, lockUpdates: ctx.lockUpdates };
 }
