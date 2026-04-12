@@ -12,8 +12,6 @@
   <a href="https://github.com/yiftahb/agsync/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/agsync-cli" alt="license"></a>
 </p>
 
-Define your AI agent skills, commands, and tool configurations once in `.agsync/`, then generate output for every coding agent your team uses.
-
 ## Supported Agents
 
 | Agent | Instructions | Skills | Commands | MCP |
@@ -39,249 +37,30 @@ Or run directly:
 npx agsync-cli
 ```
 
-## Quick Start
+## Features
 
-```bash
-# Scaffold a new project
-agsync init
+🤖 **Multi-Agent Sync** — Define skills, commands, and instructions once in `.agsync/`, generate native output for every agent your team uses. Symlinks keep everything in sync.
 
-# Import a skill from GitHub
-agsync skill add Shubhamsaboo/awesome-llm-apps code-reviewer
+🧩 **Skill Extension** — Import skills from GitHub, extend them with local overrides, and resolve inheritance chains automatically. Supporting files (rules, scripts, references) are bundled alongside.
 
-# Validate definitions
-agsync validate
+🔌 **MCP Sync** — Define MCP servers in YAML, expand environment variables at sync time, and generate the correct config format (JSON or TOML) per agent with smart merging.
 
-# Generate agent configs
-agsync sync
-```
-
-After `agsync sync`, your repo will contain:
-
-```
-project/
-├── agsync.yaml                          # Your config
-├── .agsync/
-│   ├── instructions.md                  # Your project instructions
-│   ├── skills/*/SKILL.md               # Source of truth (skills)
-│   ├── commands/*.md                    # Source of truth (commands)
-│   └── tools/*.yaml                     # MCP tool definitions
-│
-├── AGENTS.md                            # Generated (instructions + skill listing)
-├── .agents/skills/*/SKILL.md            # Canonical skill output
-├── .agents/commands/*.md                # Canonical command output
-│
-├── CLAUDE.md → AGENTS.md               # Symlink
-├── .claude/skills/ → .agents/skills/    # Symlink
-├── .claude/commands/ → .agents/commands/# Symlink
-├── .cursor/skills/ → .agents/skills/    # Symlink
-├── .claude/settings.json                # Generated MCP config
-├── .cursor/mcp.json                     # Generated MCP config
-└── .codex/config.toml                   # Generated MCP config (TOML)
-```
-
-## How It Works
-
-agsync reads canonical definitions from `.agsync/`, resolves inheritance chains, and generates the native format each agent expects:
-
-- **Instructions**: `.agsync/instructions.md` is combined with a skill listing to generate `AGENTS.md`. Agent-specific instruction files (`CLAUDE.md`, `GEMINI.md`, etc.) are symlinks to `AGENTS.md`
-- **Skills**: Generated as `SKILL.md` files in `.agents/skills/` (canonical output). Agent-specific directories (`.claude/skills/`, `.cursor/skills/`, etc.) are symlinks to `.agents/skills/`
-- **Commands**: `.md` files in `.agsync/commands/` are copied to `.agents/commands/`. Agent-specific command directories are symlinks
-- **MCP configs**: Generated per-agent in the correct format (JSON or TOML) and merged with existing entries
+🔒 **Gitignore Management** — Automatically manage `.gitignore` entries for generated output. Choose between `on` (all output), `mcpOnly` (default, MCP configs only), or `off`.
 
 ## Commands
 
-### `agsync init`
-
-Creates `agsync.yaml` and the `.agsync/` directory structure with a sample skill, instructions template, and commands directory.
-
-### `agsync skill add <org/repo> <skill-name>`
-
-Imports a skill from a GitHub repository. Creates a `SKILL.md` stub with the skill's name, description, and source reference. The actual content is fetched during `agsync sync`.
-
-```bash
-agsync skill add Shubhamsaboo/awesome-llm-apps code-reviewer
-agsync skill add yiftahb/agsync agent-skills
-```
-
-### `agsync skill remove <skill-name>`
-
-Removes a skill from `.agsync/skills/`.
-
-### `agsync validate`
-
-Validates all config and definitions: schema checks, duplicate names, cross-references between skills and tools.
-
-### `agsync plan`
-
-Preview what `sync` would do without writing any files.
-
-### `agsync sync`
-
-The core command. Resolves skills, generates output, creates symlinks, and writes MCP configs.
-
-### `agsync doctor`
-
-Checks environment health: Node.js version, config presence, hierarchy chain, and enabled agents.
-
-## Skill Examples
-
-Each skill is a directory under `.agsync/skills/` with a `SKILL.md` file.
-
-### Simple skill
-
-```markdown
-<!-- .agsync/skills/testing-standards/SKILL.md -->
----
-name: testing-standards
-description: >
-  Enforces testing standards. Use when writing or reviewing tests.
----
-
-Always write tests using the project's test framework.
-Ensure >80% coverage on new code.
-Use descriptive test names that explain the expected behavior.
-```
-
-### Imported skill
-
-```bash
-agsync skill add Shubhamsaboo/awesome-llm-apps code-reviewer
-```
-
-Creates a SKILL.md stub:
-
-```markdown
----
-name: code-reviewer
-description: Reviews code for quality, security, and performance.
-source:
-  registry: github
-  org: Shubhamsaboo
-  repo: awesome-llm-apps
-  path: awesome_agent_skills/code-reviewer
----
-```
-
-### Extended imported skill
-
-Add instructions below the frontmatter to extend:
-
-```markdown
----
-name: code-reviewer
-description: Security-focused code reviewer for our team.
-source:
-  registry: github
-  org: Shubhamsaboo
-  repo: awesome-llm-apps
-  path: awesome_agent_skills/code-reviewer
-tools:
-  - github
----
-
-Additionally, focus on OWASP Top 10 vulnerabilities.
-Flag any hardcoded secrets or credentials.
-```
-
-## MCP Tool Definitions
-
-Define MCP servers in `.agsync/tools/*.yaml`:
-
-```yaml
-name: github
-description: GitHub MCP server
-type: mcp
-command: npx
-args: ["-y", "@modelcontextprotocol/server-github"]
-env:
-  GITHUB_PERSONAL_ACCESS_TOKEN: $GITHUB_PERSONAL_ACCESS_TOKEN
-```
-
-Environment variables are expanded at sync time. Add generated MCP config files to `.gitignore` to avoid committing secrets.
-
-## Features
-
-### Global Feature Togglers
-
-The `features:` block provides master switches for each feature type. All default to `false`. When a global feature is `false`, it is disabled for **all** agents regardless of per-agent configuration.
-
-```yaml
-features:
-  instructions: true   # AGENTS.md + instruction symlinks
-  skills: true         # .agents/skills/ + skill symlinks
-  commands: true       # .agents/commands/ + command symlinks
-  mcp: true            # MCP config file generation
-```
-
-### Gitignore Management
-
-The `gitignore:` option controls how `agsync sync` manages your `.gitignore` file. Managed entries are placed in a section between `# agsync:begin` and `# agsync:end`.
-
-| Mode | Behavior |
-|------|----------|
-| `on` | Add all generated output (`.agents/`, `AGENTS.md`, symlinks, MCP configs) |
-| `mcpOnly` | Add only MCP config file paths (default) |
-| `off` | Do not manage `.gitignore` |
-
-This is especially useful for MCP configs that may contain expanded environment variables.
-
-## Configuration
-
-`agsync.yaml` at the project root:
-
-```yaml
-version: "1"
-
-features:
-  instructions: true
-  skills: true
-  commands: true
-  mcp: true
-
-gitignore: mcpOnly
-
-skills:
-  - path: .agsync/skills/*
-commands:
-  - path: .agsync/commands/*
-tools:
-  - path: .agsync/tools/*.yaml
-
-agents:
-  claude:
-    instructions: { enabled: true }
-    skills: { enabled: true }
-    commands: { enabled: true }
-    mcp: { enabled: true }
-  cursor:
-    skills: { enabled: true }
-    commands: { enabled: true }
-    mcp: { enabled: true }
-  codex:
-    instructions: { enabled: true }
-    skills: { enabled: true }
-    mcp: { enabled: true }
-  copilot:
-    instructions: { enabled: true }
-    commands: { enabled: true }
-    mcp: { enabled: true }
-```
-
-Each agent's features are disabled by default. Only list the agents and features you want active.
-
-## Monorepo Support
-
-Place `agsync.yaml` at multiple levels. Configs are collected and merged from the git root down:
-
-```
-monorepo/
-├── agsync.yaml              # Org-wide config
-├── .agsync/skills/
-├── apps/
-│   └── api/
-│       ├── agsync.yaml      # API-specific additions
-│       └── .agsync/skills/
-```
+| Command | Description |
+|---------|-------------|
+| `agsync init` | Scaffold a new project with `agsync.yaml` and `.agsync/` |
+| `agsync skill add <org/repo> <name>` | Import a skill from GitHub |
+| `agsync skill remove <name>` | Remove a skill |
+| `agsync validate` | Validate config, skills, commands, and tool references |
+| `agsync plan` | Preview changes without writing files |
+| `agsync sync` | Generate output for all enabled agents |
+| `agsync doctor` | Check environment health and enabled agents |
+| `agsync version` | Show current version and check for updates |
+| `agsync update` | Update to the latest version |
+| `agsync help` | Show extended help |
 
 ## License
 

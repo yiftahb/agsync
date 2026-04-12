@@ -23,7 +23,7 @@ tools:
 # "on"      — add all generated output to .gitignore
 # "mcpOnly" — only add MCP config files (default)
 # "off"     — don't touch .gitignore
-gitignore: mcpOnly
+gitignore: on
 
 # ── Agent configuration ──────────────────────────────────────
 # Enable features per agent. Unlisted agents stay off entirely.

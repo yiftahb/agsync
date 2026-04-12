@@ -14,30 +14,7 @@ const SAMPLE_CONFIG = {
   skills: [{ path: ".agsync/skills/*" }],
   commands: [{ path: ".agsync/commands/*" }],
   tools: [{ path: ".agsync/tools/*.yaml" }],
-  agents: {
-    claude: {
-      instructions: { enabled: true },
-      skills: { enabled: true },
-      commands: { enabled: true },
-      mcp: { enabled: true },
-    },
-    cursor: {
-      skills: { enabled: true },
-      commands: { enabled: true },
-      mcp: { enabled: true },
-    },
-    codex: {
-      instructions: { enabled: true },
-      skills: { enabled: true },
-      commands: { enabled: true },
-      mcp: { enabled: true },
-    },
-    copilot: {
-      instructions: { enabled: true },
-      commands: { enabled: true },
-      mcp: { enabled: true },
-    },
-  },
+  agents: {},
 };
 
 const DEFAULT_SKILL_MD = `---

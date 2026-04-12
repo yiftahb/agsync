@@ -48,18 +48,14 @@ describe("runInit", () => {
     expect(instructions).toContain("agsync");
   });
 
-  it("writes agsync.yaml with agents block, features, and gitignore", async () => {
+  it("writes agsync.yaml with empty agents, features, and gitignore", async () => {
     await runInit(tempDir);
 
     const raw = await readFile(join(tempDir, "agsync.yaml"), "utf-8");
     const cfg = parseYaml(raw) as Record<string, unknown>;
 
-    expect(cfg.agents).toBeDefined();
+    expect(cfg.agents).toEqual({});
     expect(cfg.targets).toBeUndefined();
-    expect((cfg.agents as Record<string, unknown>).claude).toMatchObject({
-      instructions: { enabled: true },
-      skills: { enabled: true },
-    });
     expect(cfg.features).toEqual({
       instructions: true,
       skills: true,
