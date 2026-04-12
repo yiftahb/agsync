@@ -17,12 +17,12 @@
 | Agent | Instructions | Skills | Commands | MCP |
 |-------|-------------|--------|----------|-----|
 | Claude Code | `CLAUDE.md` | `.claude/skills/` | `.claude/commands/` | `.claude/settings.json` |
-| Cursor | -- | `.cursor/skills/` | `.cursor/commands/` | `.cursor/mcp.json` |
+| Cursor | `AGENTS.md` | `.cursor/skills/` | `.cursor/commands/` | `.cursor/mcp.json` |
 | Codex | `.codex/instructions.md` | `.codex/skills/` | `.codex/commands/` | `.codex/config.toml` |
-| Windsurf | -- | `.windsurf/skills/` | `.windsurf/commands/` | `.windsurf/mcp_config.json` |
+| Windsurf | `AGENTS.md` | `.windsurf/skills/` | `.windsurf/commands/` | `.windsurf/mcp_config.json` |
 | Copilot | `.github/copilot-instructions.md` | -- | `.github/agents/` | `.mcp.json` |
 | Gemini | `GEMINI.md` | `.gemini/skills/` | `.gemini/commands/` | `.gemini/settings.json` |
-| OpenCode | -- | `.opencode/skills/` | `.opencode/command/` | `opencode.json` |
+| OpenCode | `AGENTS.md` | `.opencode/skills/` | `.opencode/command/` | `opencode.json` |
 | Antigravity | `.agent/rules/instructions.md` | `.agent/skills/` | `.agent/commands/` | -- |
 
 ## Install

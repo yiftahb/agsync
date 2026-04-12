@@ -64,8 +64,8 @@ describe("resolveAgentConfig", () => {
 
   it("throws when enabling a feature the agent does not support", () => {
     expect(() =>
-      resolveAgentConfig({ cursor: { instructions: { enabled: true } } })
-    ).toThrow(/does not support feature "instructions"/);
+      resolveAgentConfig({ copilot: { skills: { enabled: true } } })
+    ).toThrow(/does not support feature "skills"/);
   });
 
   it("throws when the agent has no mcp support", () => {

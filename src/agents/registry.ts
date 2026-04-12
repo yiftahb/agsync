@@ -21,6 +21,7 @@ const AGENT_REGISTRY: Record<string, AgentDefinition> = {
     name: "cursor",
     description: "Cursor AI editor",
     features: {
+      instructions: { enabled: false, destination: "AGENTS.md", type: "generated" },
       skills: { enabled: false, destination: ".cursor/skills", type: "symlink" },
       commands: { enabled: false, destination: ".cursor/commands", type: "symlink" },
       mcp: {
@@ -52,6 +53,7 @@ const AGENT_REGISTRY: Record<string, AgentDefinition> = {
     name: "windsurf",
     description: "Windsurf (Cascade)",
     features: {
+      instructions: { enabled: false, destination: "AGENTS.md", type: "generated" },
       skills: { enabled: false, destination: ".windsurf/skills", type: "symlink" },
       commands: { enabled: false, destination: ".windsurf/commands", type: "symlink" },
       mcp: {
@@ -98,6 +100,7 @@ const AGENT_REGISTRY: Record<string, AgentDefinition> = {
     name: "opencode",
     description: "OpenCode AI",
     features: {
+      instructions: { enabled: false, destination: "AGENTS.md", type: "generated" },
       skills: { enabled: false, destination: ".opencode/skills", type: "symlink" },
       commands: { enabled: false, destination: ".opencode/command", type: "symlink" },
       mcp: {
