@@ -11,7 +11,7 @@ import {
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { stringify as toYaml } from "yaml";
-import { runSync } from "@/commands/sync";
+import { runSync, skillDirName } from "@/commands/sync";
 
 let tempDir: string;
 
@@ -93,6 +93,20 @@ Help the user with coding tasks
     })
   );
 }
+
+describe("skillDirName", () => {
+  it("replaces colons with double dashes", () => {
+    expect(skillDirName("frontend:ui-kit")).toBe("frontend--ui-kit");
+  });
+
+  it("leaves names without colons unchanged", () => {
+    expect(skillDirName("my-skill")).toBe("my-skill");
+  });
+
+  it("handles nested scopes", () => {
+    expect(skillDirName("apps:frontend:ui-kit")).toBe("apps--frontend--ui-kit");
+  });
+});
 
 describe("runSync", () => {
   it("generates AGENTS.md with managed header, instructions, and skill listing", async () => {
@@ -360,6 +374,114 @@ Body
     await runSync(tempDir);
 
     await expect(stat(join(tempDir, ".gitignore"))).rejects.toThrow();
+  });
+
+  it("outputs scoped skills from child config with correct dir name and scope warning", async () => {
+    await mkdir(join(tempDir, ".agsync", "skills", "root-skill"), { recursive: true });
+    await mkdir(join(tempDir, ".agsync", "tools"), { recursive: true });
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        features: { instructions: true, skills: true, commands: true, mcp: true },
+        agents: {},
+        skills: [{ path: ".agsync/skills/*" }],
+        commands: [],
+        tools: [],
+      })
+    );
+    await writeFile(
+      join(tempDir, ".agsync", "instructions.md"),
+      "Root instructions\n"
+    );
+    await writeFile(
+      join(tempDir, ".agsync", "skills", "root-skill", "SKILL.md"),
+      `---\nname: root-skill\ndescription: Root skill\n---\n\nRoot body\n`
+    );
+
+    const childDir = join(tempDir, "frontend");
+    await mkdir(join(childDir, ".agsync", "skills", "ui-kit"), { recursive: true });
+    await writeFile(
+      join(childDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        features: { instructions: true, skills: true, commands: true, mcp: true },
+        agents: {},
+        skills: [{ path: ".agsync/skills/*" }],
+        commands: [],
+        tools: [],
+      })
+    );
+    await writeFile(
+      join(childDir, ".agsync", "skills", "ui-kit", "SKILL.md"),
+      `---\nname: ui-kit\ndescription: UI components\n---\n\nUI instructions\n`
+    );
+
+    await runSync(childDir);
+
+    const rootSkillMd = await readFile(
+      join(tempDir, ".agents", "skills", "root-skill", "SKILL.md"),
+      "utf-8"
+    );
+    expect(rootSkillMd).toContain("name: root-skill");
+    expect(rootSkillMd).not.toContain("scope:");
+
+    const scopedSkillMd = await readFile(
+      join(tempDir, ".agents", "skills", "frontend--ui-kit", "SKILL.md"),
+      "utf-8"
+    );
+    expect(scopedSkillMd).toContain("name: frontend:ui-kit");
+    expect(scopedSkillMd).toContain("scope: frontend/");
+    expect(scopedSkillMd).toContain("Scope: NEVER use this skill outside of `frontend/`");
+
+    const agentsMd = await readFile(join(tempDir, "AGENTS.md"), "utf-8");
+    expect(agentsMd).toContain("**root-skill**");
+    expect(agentsMd).toContain("### Scope: `frontend/`");
+    expect(agentsMd).toContain("**frontend:ui-kit**");
+  });
+
+  it("outputs scoped commands from child config with scope warning", async () => {
+    await mkdir(join(tempDir, ".agsync", "tools"), { recursive: true });
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        features: { instructions: true, skills: true, commands: true, mcp: true },
+        agents: {},
+        skills: [],
+        commands: [],
+        tools: [],
+      })
+    );
+    await writeFile(join(tempDir, ".agsync", "instructions.md"), "");
+
+    const childDir = join(tempDir, "backend");
+    await mkdir(join(childDir, ".agsync", "commands"), { recursive: true });
+    await writeFile(
+      join(childDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        features: { instructions: true, skills: true, commands: true, mcp: true },
+        agents: {},
+        skills: [],
+        commands: [{ path: ".agsync/commands/*.md" }],
+        tools: [],
+      })
+    );
+    await writeFile(
+      join(childDir, ".agsync", "commands", "deploy.md"),
+      "Run the deploy script"
+    );
+
+    await runSync(childDir);
+
+    const cmdMd = await readFile(
+      join(tempDir, ".agents", "commands", "backend--deploy.md"),
+      "utf-8"
+    );
+    expect(cmdMd).toContain("managed by agsync");
+    expect(cmdMd).toContain("Scope: NEVER use this command outside of `backend/`");
+    expect(cmdMd).toContain("Run the deploy script");
   });
 
   it("global features mask disables agent features", async () => {

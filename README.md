@@ -45,6 +45,8 @@ npx agsync-cli
 
 🔌 **MCP Sync** — Define MCP servers in YAML, expand environment variables at sync time, and generate the correct config format (JSON or TOML) per agent with smart merging.
 
+📁 **Monorepo Scoping** — Run `agsync` from any subfolder in a monorepo. Child skills and commands are automatically prefixed (e.g. `frontend:my-skill`) and output to the repo root with scope warnings injected so agents only apply them in the right context.
+
 🔒 **Gitignore Management** — Automatically manage `.gitignore` entries for generated output. Choose between `on` (all output), `mcpOnly` (default, MCP configs only), or `off`.
 
 ## Commands

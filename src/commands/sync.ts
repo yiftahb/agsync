@@ -4,7 +4,7 @@ import {
 } from "node:fs/promises";
 import { resolve, dirname, relative } from "node:path";
 import { stringify as toToml } from "smol-toml";
-import { loadHierarchicalConfig } from "@/loader/hierarchy";
+import { loadHierarchicalConfig, findGitRoot } from "@/loader/hierarchy";
 import { resolveAllSkills } from "@/resolver/skills";
 import { resolveAgentConfig } from "@/agents/registry";
 import { runValidate } from "@/commands/validate";
@@ -21,6 +21,10 @@ const MANAGED_HEADER = [
   "",
 ].join("\n");
 
+export function skillDirName(name: string): string {
+  return name.replace(/:/g, "--");
+}
+
 function buildOutputSkillMd(skill: ResolvedSkill, tools: ToolDefinition[]): string {
   const lines: string[] = [];
 
@@ -28,8 +32,17 @@ function buildOutputSkillMd(skill: ResolvedSkill, tools: ToolDefinition[]): stri
   lines.push("---");
   lines.push(`name: ${skill.name}`);
   lines.push(`description: ${skill.description}`);
+  if (skill.scope) {
+    lines.push(`scope: ${skill.scope}`);
+  }
   lines.push("---");
   lines.push("");
+
+  if (skill.scope) {
+    lines.push(`> **Scope: NEVER use this skill outside of \`${skill.scope}\`.**`);
+    lines.push("");
+  }
+
   lines.push(skill.instructions.trim());
 
   if (skill.tools.length > 0) {
@@ -65,9 +78,31 @@ function buildAgentsMd(
   lines.push("<!-- agsync:begin -->");
   lines.push("## Available Skills");
   lines.push("");
-  for (const skill of skills) {
+
+  const globalSkills = skills.filter((s) => !s.scope);
+  const scopedSkills = skills.filter((s) => s.scope);
+
+  for (const skill of globalSkills) {
     lines.push(`- **${skill.name}**: ${skill.description}`);
   }
+
+  if (scopedSkills.length > 0) {
+    const byScope = new Map<string, ResolvedSkill[]>();
+    for (const skill of scopedSkills) {
+      const group = byScope.get(skill.scope!) ?? [];
+      group.push(skill);
+      byScope.set(skill.scope!, group);
+    }
+    for (const [scope, group] of byScope) {
+      lines.push("");
+      lines.push(`### Scope: \`${scope}\``);
+      lines.push("");
+      for (const skill of group) {
+        lines.push(`- **${skill.name}**: ${skill.description}`);
+      }
+    }
+  }
+
   lines.push("");
   lines.push("Skills are managed by agsync. Full definitions are in `.agents/skills/`.");
   lines.push("<!-- agsync:end -->");
@@ -76,6 +111,11 @@ function buildAgentsMd(
 }
 
 function buildOutputCommand(cmd: CommandDefinition): string {
+  if (cmd.scope) {
+    return MANAGED_HEADER +
+      `> **Scope: NEVER use this command outside of \`${cmd.scope}\`.**\n\n` +
+      cmd.content;
+  }
   return MANAGED_HEADER + cmd.content;
 }
 
@@ -173,25 +213,28 @@ export async function buildSyncPlan(
   const agents = resolveAgentConfig(loaded.config.agents, loaded.config.features);
   const commands = loaded.commands;
 
-  const canonicalSkillsDir = resolve(targetDir, ".agents", "skills");
-  const canonicalCommandsDir = resolve(targetDir, ".agents", "commands");
+  const gitRoot = findGitRoot(targetDir);
+  const canonicalSkillsDir = resolve(gitRoot, ".agents", "skills");
+  const canonicalCommandsDir = resolve(gitRoot, ".agents", "commands");
   const skillOutputDirs = [canonicalSkillsDir];
 
-  const definedSkillNames = new Set(resolvedSkills.map((s) => s.name));
+  const definedSkillDirNames = new Set(resolvedSkills.map((s) => skillDirName(s.name)));
   const existingSkillNames = new Set<string>();
   for (const name of await listSubdirectories(canonicalSkillsDir)) {
     existingSkillNames.add(name);
   }
 
   const plannedSkills: PlannedSkill[] = [];
-  for (const name of definedSkillNames) {
+  for (const skill of resolvedSkills) {
+    const dirName = skillDirName(skill.name);
     plannedSkills.push({
-      name,
-      operation: existingSkillNames.has(name) ? "update" : "create",
+      name: dirName,
+      operation: existingSkillNames.has(dirName) ? "update" : "create",
+      sourceDir: skill.sourceDir,
     });
   }
   for (const name of existingSkillNames) {
-    if (!definedSkillNames.has(name)) {
+    if (!definedSkillDirNames.has(name)) {
       plannedSkills.push({ name, operation: "delete" });
     }
   }
@@ -199,7 +242,8 @@ export async function buildSyncPlan(
   const plannedFiles: PlannedFile[] = [];
 
   for (const skill of resolvedSkills) {
-    const skillMdPath = resolve(canonicalSkillsDir, skill.name, "SKILL.md");
+    const dirName = skillDirName(skill.name);
+    const skillMdPath = resolve(canonicalSkillsDir, dirName, "SKILL.md");
     const content = buildOutputSkillMd(skill, tools);
     const existing = await readFileOrEmpty(skillMdPath);
     plannedFiles.push({
@@ -211,7 +255,8 @@ export async function buildSyncPlan(
   }
 
   for (const cmd of commands) {
-    const cmdPath = resolve(canonicalCommandsDir, `${cmd.name}.md`);
+    const cmdDirName = skillDirName(cmd.name);
+    const cmdPath = resolve(canonicalCommandsDir, `${cmdDirName}.md`);
     const content = buildOutputCommand(cmd);
     const existing = await readFileOrEmpty(cmdPath);
     plannedFiles.push({
@@ -224,7 +269,7 @@ export async function buildSyncPlan(
 
   const instructionsPath = resolve(baseDir, ".agsync", "instructions.md");
   const userInstructions = await readFileOrEmpty(instructionsPath);
-  const agentsMdPath = resolve(targetDir, "AGENTS.md");
+  const agentsMdPath = resolve(gitRoot, "AGENTS.md");
   const agentsMdContent = buildAgentsMd(userInstructions, resolvedSkills);
   const existingAgentsMd = await readFileOrEmpty(agentsMdPath);
   plannedFiles.push({
@@ -235,7 +280,7 @@ export async function buildSyncPlan(
   });
 
   for (const [agentName, agentCfg] of Object.entries(agents)) {
-    planAgentFeatures(agentName, agentCfg, targetDir, agentsMdPath, canonicalSkillsDir, canonicalCommandsDir, tools, plannedFiles);
+    planAgentFeatures(agentName, agentCfg, gitRoot, agentsMdPath, canonicalSkillsDir, canonicalCommandsDir, tools, plannedFiles);
   }
 
   return { skills: plannedSkills, files: plannedFiles, skillOutputDirs, canonicalSkillsDir: skillsDir, warnings };
@@ -353,20 +398,19 @@ async function copySupportingFiles(plan: SyncPlan): Promise<string[]> {
   const canonicalOutputDir = plan.skillOutputDirs[0];
   if (!canonicalOutputDir) return copied;
 
-  const activeSkills = plan.skills
-    .filter((s) => s.operation !== "delete")
-    .map((s) => s.name);
+  const activeSkills = plan.skills.filter((s) => s.operation !== "delete");
 
-  for (const skillName of activeSkills) {
-    const sourceDir = resolve(plan.canonicalSkillsDir, skillName);
+  for (const skill of activeSkills) {
+    const sourceDir = skill.sourceDir ?? resolve(plan.canonicalSkillsDir, skill.name);
     try {
       await fsStat(sourceDir);
     } catch {
       continue;
     }
 
-    const skipFiles = new Set(["SKILL.md", `${skillName}.yaml`]);
-    const targetOutputDir = resolve(canonicalOutputDir, skillName);
+    const baseName = skill.name.includes("--") ? skill.name.split("--").pop()! : skill.name;
+    const skipFiles = new Set(["SKILL.md", `${baseName}.yaml`]);
+    const targetOutputDir = resolve(canonicalOutputDir, skill.name);
     const files = await copyDirRecursive(sourceDir, targetOutputDir, skipFiles);
     copied.push(...files);
   }

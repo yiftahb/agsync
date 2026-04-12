@@ -33,6 +33,7 @@ export const skillMdFrontmatterSchema = z.object({
   extends: z.array(z.string()).optional(),
   tools: z.array(z.string()).optional(),
   source: skillSourceSchema.optional(),
+  scope: z.string().optional(),
   license: z.string().optional(),
   metadata: z
     .object({

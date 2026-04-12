@@ -209,6 +209,8 @@ export async function resolveAllSkills(
   const resolved: ResolvedSkill[] = [];
   for (const skill of skills) {
     const result = await resolveSkillChain(skill, skillsDir, cacheDir, new Set());
+    if (skill.scope) result.scope = skill.scope;
+    if (skill.sourceDir) result.sourceDir = skill.sourceDir;
     resolved.push(result);
   }
   return resolved;

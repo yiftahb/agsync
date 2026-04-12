@@ -139,9 +139,30 @@ GITIGNORE MANAGEMENT
     mcpOnly   Add only MCP config file paths (default)
     off       Do not manage .gitignore at all
 
+MONOREPO SCOPING
+  When agsync runs in a subfolder with its own agsync.yaml, child skills and
+  commands are automatically scoped and output to the git root.
+
+  Example:
+    project/                          ← git root, agsync.yaml
+    ├── frontend/                     ← child agsync.yaml
+    │   └── .agsync/skills/ui-kit/
+    └── .agents/skills/
+        ├── shared-skill/             ← root skill (no scope)
+        └── frontend--ui-kit/         ← scoped skill
+
+  Name mapping:
+    Metadata name       frontend:ui-kit       (colon separator)
+    Directory name      frontend--ui-kit      (double-dash, filesystem-safe)
+
+  Generated SKILL.md files include a scope: field in frontmatter and a
+  prominent warning so agents only apply them within the correct subfolder.
+  AGENTS.md groups scoped skills under their scope heading.
+
 GENERATED OUTPUT
   AGENTS.md                         Generated instructions + skill listing
   .agents/skills/*/SKILL.md         Canonical skill output
+  .agents/skills/scope--name/       Scoped skill from a subfolder
   .agents/commands/*.md             Canonical command output
   CLAUDE.md                         Symlink → AGENTS.md
   GEMINI.md                         Symlink → AGENTS.md

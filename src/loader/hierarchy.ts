@@ -1,9 +1,9 @@
-import { resolve, dirname } from "node:path";
+import { resolve, dirname, relative } from "node:path";
 import { findConfigFile, loadFullConfig } from "@/loader/config";
 import type { LoadedConfig, UserAgentConfig, GlobalFeatures, GitignoreMode } from "@/types";
 import { existsSync } from "node:fs";
 
-function findGitRoot(startDir: string): string {
+export function findGitRoot(startDir: string): string {
   let current = resolve(startDir);
   while (current !== dirname(current)) {
     if (existsSync(resolve(current, ".git"))) {
@@ -83,7 +83,29 @@ export async function loadHierarchicalConfig(startDir: string): Promise<LoadedCo
     return configs[0];
   }
 
+  const rootConfigDir = dirname(configs[0].configPath);
+
   return configs.slice(1).reduce<LoadedConfig>((merged, current) => {
+    const configDir = dirname(current.configPath);
+    const scopePrefix = relative(rootConfigDir, configDir).replace(/\\/g, "/");
+
+    const scopedSkills = scopePrefix
+      ? current.skills.map((s) => ({
+          ...s,
+          name: `${scopePrefix}:${s.name}`,
+          scope: `${scopePrefix}/`,
+          sourceDir: resolve(configDir, ".agsync", "skills", s.name),
+        }))
+      : current.skills;
+
+    const scopedCommands = scopePrefix
+      ? current.commands.map((c) => ({
+          ...c,
+          name: `${scopePrefix}:${c.name}`,
+          scope: `${scopePrefix}/`,
+        }))
+      : current.commands;
+
     return {
       config: {
         version: current.config.version,
@@ -94,8 +116,8 @@ export async function loadHierarchicalConfig(startDir: string): Promise<LoadedCo
         commands: [...merged.config.commands, ...current.config.commands],
         tools: [...merged.config.tools, ...current.config.tools],
       },
-      skills: [...merged.skills, ...current.skills],
-      commands: [...merged.commands, ...current.commands],
+      skills: [...merged.skills, ...scopedSkills],
+      commands: [...merged.commands, ...scopedCommands],
       tools: [...merged.tools, ...current.tools],
       configPath: current.configPath,
     };

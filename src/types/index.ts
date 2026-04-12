@@ -67,6 +67,8 @@ export interface SkillDefinition {
   instructions?: string;
   tools?: string[];
   source?: SkillSource;
+  scope?: string;
+  sourceDir?: string;
 }
 
 export interface ResolvedSkill {
@@ -75,11 +77,14 @@ export interface ResolvedSkill {
   instructions: string;
   tools: string[];
   extendsChain: string[];
+  scope?: string;
+  sourceDir?: string;
 }
 
 export interface CommandDefinition {
   name: string;
   content: string;
+  scope?: string;
 }
 
 export interface GlobalFeatures {
@@ -135,6 +140,7 @@ export type PlannedOperation = "create" | "update" | "delete" | "unchanged";
 export interface PlannedSkill {
   name: string;
   operation: PlannedOperation;
+  sourceDir?: string;
 }
 
 export interface PlannedFile {

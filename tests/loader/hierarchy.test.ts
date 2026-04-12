@@ -75,6 +75,14 @@ describe("collectConfigChain", () => {
   });
 });
 
+describe("findGitRoot", () => {
+  it("is exported", async () => {
+    const { findGitRoot } = await import("@/loader/hierarchy");
+    expect(typeof findGitRoot).toBe("function");
+    expect(findGitRoot(tempDir)).toBe(tempDir);
+  });
+});
+
 describe("loadHierarchicalConfig", () => {
   it("merges parent and child skills and concatenates skill lists", async () => {
     await mkdir(join(tempDir, "skills", "root-skill"), { recursive: true });
@@ -121,7 +129,7 @@ describe("loadHierarchicalConfig", () => {
     expect(result!.config.agents.codex?.instructions?.enabled).toBe(true);
     expect(result!.config.agents.codex?.skills?.enabled).toBe(true);
     expect(result!.skills).toHaveLength(2);
-    expect(result!.skills.map((s) => s.name)).toEqual(["root-skill", "child-skill"]);
+    expect(result!.skills.map((s) => s.name)).toEqual(["root-skill", "apps/api:child-skill"]);
   });
 
   it("deep-merges agents so child feature fields override parent per agent", async () => {
@@ -209,6 +217,87 @@ describe("loadHierarchicalConfig", () => {
       commands: false,
       mcp: true,
     });
+  });
+
+  it("scopes child skills with prefix and sourceDir", async () => {
+    await mkdir(join(tempDir, "skills", "root-skill"), { recursive: true });
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        agents: {},
+        skills: [{ path: "skills/*" }],
+        commands: [],
+        tools: [],
+      })
+    );
+    await writeFile(
+      join(tempDir, "skills", "root-skill", "SKILL.md"),
+      skillMd({ name: "root-skill", description: "Root" }, "Root body")
+    );
+
+    const childDir = join(tempDir, "frontend");
+    await mkdir(join(childDir, "skills", "ui-kit"), { recursive: true });
+    await writeFile(
+      join(childDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        agents: {},
+        skills: [{ path: "skills/*" }],
+        commands: [],
+        tools: [],
+      })
+    );
+    await writeFile(
+      join(childDir, "skills", "ui-kit", "SKILL.md"),
+      skillMd({ name: "ui-kit", description: "UI components" }, "UI body")
+    );
+
+    const result = await loadHierarchicalConfig(childDir);
+    expect(result).not.toBeNull();
+    expect(result!.skills).toHaveLength(2);
+
+    const rootSkill = result!.skills.find((s) => s.name === "root-skill");
+    expect(rootSkill).toBeDefined();
+    expect(rootSkill!.scope).toBeUndefined();
+
+    const childSkill = result!.skills.find((s) => s.name === "frontend:ui-kit");
+    expect(childSkill).toBeDefined();
+    expect(childSkill!.scope).toBe("frontend/");
+    expect(childSkill!.sourceDir).toContain(join("frontend", ".agsync", "skills", "ui-kit"));
+  });
+
+  it("scopes child commands with prefix", async () => {
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        agents: {},
+        skills: [],
+        commands: [],
+        tools: [],
+      })
+    );
+
+    const childDir = join(tempDir, "backend");
+    await mkdir(join(childDir, "cmds"), { recursive: true });
+    await writeFile(
+      join(childDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        agents: {},
+        skills: [],
+        commands: [{ path: "cmds/*.md" }],
+        tools: [],
+      })
+    );
+    await writeFile(join(childDir, "cmds", "deploy.md"), "Deploy the backend");
+
+    const result = await loadHierarchicalConfig(childDir);
+    expect(result).not.toBeNull();
+    const cmd = result!.commands.find((c) => c.name === "backend:deploy");
+    expect(cmd).toBeDefined();
+    expect(cmd!.scope).toBe("backend/");
   });
 
   it("merges gitignore — child overrides parent", async () => {
