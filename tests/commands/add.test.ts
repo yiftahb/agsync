@@ -80,10 +80,20 @@ describe("runAdd", () => {
     expect(files[0]).not.toContain(".agsync/.agsync");
   });
 
-  it("throws when no agsync.yaml is found", async () => {
+  it("throws when no .agsync/ or agsync.yaml is found", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "agsync-no-config-"));
     await expect(runAdd(emptyDir, "test", "")).rejects.toThrow(/agsync.yaml/);
     await rm(emptyDir, { recursive: true, force: true });
+  });
+
+  it("adds skill to nearest .agsync/ in subfolder", async () => {
+    await setupConfig(tempDir);
+    const subDir = join(tempDir, "frontend");
+    await mkdir(join(subDir, ".agsync", "skills"), { recursive: true });
+
+    const files = await runAdd(subDir, "sub-skill", "");
+    expect(files).toHaveLength(1);
+    expect(files[0]).toContain(join(subDir, ".agsync", "skills", "sub-skill"));
   });
 
   it("parses github: prefix and fetches from registry", async () => {
@@ -161,7 +171,7 @@ describe("runAddCommand", () => {
     expect(content).toContain("# deploy");
   });
 
-  it("finds nearest config when run from a subdirectory", async () => {
+  it("finds nearest .agsync/ when run from a subdirectory", async () => {
     await setupConfig(tempDir);
     const subDir = join(tempDir, "src");
     await mkdir(subDir, { recursive: true });
@@ -170,7 +180,16 @@ describe("runAddCommand", () => {
     expect(file).toContain(join(tempDir, ".agsync", "commands", "test-cmd.md"));
   });
 
-  it("throws when no agsync.yaml is found", async () => {
+  it("adds to subfolder .agsync/ when present", async () => {
+    await setupConfig(tempDir);
+    const subDir = join(tempDir, "frontend");
+    await mkdir(join(subDir, ".agsync"), { recursive: true });
+
+    const file = await runAddCommand(subDir, "build");
+    expect(file).toContain(join(subDir, ".agsync", "commands", "build.md"));
+  });
+
+  it("throws when no .agsync/ or agsync.yaml is found", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "agsync-no-config-"));
     await expect(runAddCommand(emptyDir, "test")).rejects.toThrow(/agsync.yaml/);
     await rm(emptyDir, { recursive: true, force: true });
@@ -188,7 +207,7 @@ describe("runAddTool", () => {
     expect(content).toContain("type: mcp");
   });
 
-  it("finds nearest config when run from a subdirectory", async () => {
+  it("finds nearest .agsync/ when run from a subdirectory", async () => {
     await setupConfig(tempDir);
     const subDir = join(tempDir, "src");
     await mkdir(subDir, { recursive: true });
@@ -197,7 +216,16 @@ describe("runAddTool", () => {
     expect(file).toContain(join(tempDir, ".agsync", "tools", "my-tool.yaml"));
   });
 
-  it("throws when no agsync.yaml is found", async () => {
+  it("adds to subfolder .agsync/ when present", async () => {
+    await setupConfig(tempDir);
+    const subDir = join(tempDir, "services");
+    await mkdir(join(subDir, ".agsync"), { recursive: true });
+
+    const file = await runAddTool(subDir, "db");
+    expect(file).toContain(join(subDir, ".agsync", "tools", "db.yaml"));
+  });
+
+  it("throws when no .agsync/ or agsync.yaml is found", async () => {
     const emptyDir = await mkdtemp(join(tmpdir(), "agsync-no-config-"));
     await expect(runAddTool(emptyDir, "test")).rejects.toThrow(/agsync.yaml/);
     await rm(emptyDir, { recursive: true, force: true });

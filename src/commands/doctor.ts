@@ -1,5 +1,5 @@
-import { findConfigFile, loadConfigFile } from "@/loader/config";
-import { collectConfigChain } from "@/loader/hierarchy";
+import { findConfigFile, loadConfigFile, discoverAgsyncDirs } from "@/loader/config";
+import { findGitRoot } from "@/loader/hierarchy";
 import { resolveAgentConfig, getEnabledAgents } from "@/agents/registry";
 import type { DoctorCheck } from "@/types";
 
@@ -20,15 +20,16 @@ async function checkConfigExists(targetDir: string): Promise<DoctorCheck> {
   return { name: "agsync.yaml", status: "fail", message: "Not found. Run 'agsync init' to create one" };
 }
 
-async function checkHierarchy(targetDir: string): Promise<DoctorCheck> {
-  const chain = await collectConfigChain(targetDir);
-  if (chain.length > 1) {
-    return { name: "Config hierarchy", status: "pass", message: `${chain.length} configs in chain` };
+async function checkAgsyncDirs(targetDir: string): Promise<DoctorCheck> {
+  const gitRoot = findGitRoot(targetDir);
+  const dirs = await discoverAgsyncDirs(gitRoot);
+  if (dirs.length > 1) {
+    return { name: ".agsync/ directories", status: "pass", message: `${dirs.length} .agsync/ dirs found (monorepo)` };
   }
-  if (chain.length === 1) {
-    return { name: "Config hierarchy", status: "pass", message: "Single config (no parent)" };
+  if (dirs.length === 1) {
+    return { name: ".agsync/ directories", status: "pass", message: "Single .agsync/ directory" };
   }
-  return { name: "Config hierarchy", status: "warn", message: "No configs found in hierarchy" };
+  return { name: ".agsync/ directories", status: "warn", message: "No .agsync/ directories found" };
 }
 
 async function checkEnabledAgents(targetDir: string): Promise<DoctorCheck[]> {
@@ -70,7 +71,7 @@ export async function runDoctor(targetDir: string): Promise<DoctorCheck[]> {
 
   checks.push(await checkNodeVersion());
   checks.push(await checkConfigExists(targetDir));
-  checks.push(await checkHierarchy(targetDir));
+  checks.push(await checkAgsyncDirs(targetDir));
 
   const agentChecks = await checkEnabledAgents(targetDir);
   checks.push(...agentChecks);

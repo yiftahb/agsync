@@ -22,8 +22,8 @@ agsync reads canonical definitions from `.agsync/` and generates agent-specific 
 
 ```
 project/
-├── agsync.yaml                          # Root config (agents, sources)
-├── .agsync/
+├── agsync.yaml                          # Root config (one per repo)
+├── .agsync/                             # Root definitions
 │   ├── instructions.md                  # User-written project instructions
 │   ├── skills/                          # Skill definitions
 │   │   ├── my-skill/
@@ -37,12 +37,19 @@ project/
 │   │   └── deploy.md                    # /deploy command
 │   └── tools/*.yaml                     # MCP tool definitions
 │
+├── frontend/                            # Subfolder with its own .agsync/
+│   ├── .agsync/
+│   │   ├── instructions.md              # Subfolder instructions
+│   │   └── skills/ui-kit/SKILL.md       # Scoped skill
+│   └── AGENTS.md                        # Generated (scoped instructions)
+│
 │  ─── Generated output (do not edit) ───
-├── AGENTS.md                            # Generated from instructions.md + skill listing
+├── AGENTS.md                            # Root instructions + skill listing + scope refs
 ├── .agents/skills/*/SKILL.md            # Canonical skill output
+├── .agents/skills/frontend--ui-kit/     # Scoped skill (double-dash)
 ├── .agents/commands/*.md                # Canonical command output
 │
-│  ─── Agent symlinks (do not edit) ───
+│  ─── Agent symlinks (root only, do not edit) ───
 ├── CLAUDE.md → AGENTS.md               # Symlink
 ├── .claude/skills/ → .agents/skills/    # Symlink
 ├── .cursor/skills/ → .agents/skills/    # Symlink
@@ -87,8 +94,15 @@ source:
   org: Shubhamsaboo
   repo: awesome-llm-apps
   path: awesome_agent_skills/code-reviewer
+  version: "v1.0.0"
 ---
 ```
+
+## Version Locking
+
+External skills are pinned to exact versions via `source.version`. A lock file (`agsync-lock.yaml`) records the resolved commit/version and content hash for each external dependency.
+
+Use `--frozen` with `sync` or `plan` in CI to enforce the lock file — the command fails if the lock is missing or stale.
 
 ## Commands
 
@@ -104,14 +118,22 @@ Commands are `.md` files under `.agsync/commands/`. The filename becomes the sla
 | Command | Description |
 |---------|-------------|
 | `agsync init` | Scaffold a new project |
-| `agsync skill add <org/repo> <name>` | Import a skill from GitHub (creates SKILL.md stub) |
+| `agsync skill add <name>` | Create a local empty skill |
+| `agsync skill add github:<org/repo/path@ver>` | Import a skill from GitHub |
+| `agsync skill add clawhub:<slug@ver>` | Import a skill from ClawHub |
 | `agsync skill remove <name>` | Remove a skill |
+| `agsync command add <name>` | Create a new command (.md) |
+| `agsync command remove <name>` | Remove a command |
+| `agsync tool add <name>` | Create a new tool definition (.yaml) |
+| `agsync tool remove <name>` | Remove a tool |
 | `agsync validate` | Validate config and definitions |
-| `agsync plan` | Preview changes without writing |
-| `agsync sync` | Resolve skills, fetch sources, generate agent configs |
+| `agsync plan [--frozen]` | Preview changes without writing |
+| `agsync sync [--frozen]` | Resolve skills, fetch sources, generate agent configs |
 | `agsync doctor` | Check environment health |
 | `agsync version` | Show version and check for updates |
 | `agsync update` | Update to latest version |
+
+All `add` and `remove` commands resolve the nearest `.agsync/` directory upwards in the directory tree, so they work correctly from any subdirectory (e.g. running from `frontend/` adds to `frontend/.agsync/`).
 
 ## agsync.yaml Format
 
@@ -140,8 +162,9 @@ agents:
 
 ## Generated Output
 
-- `AGENTS.md` is generated from `.agsync/instructions.md` + skill listing. Agent-specific instruction files (CLAUDE.md, GEMINI.md, etc.) are symlinks to AGENTS.md.
-- `.agents/skills/` and `.agents/commands/` contain the canonical output with "managed by agsync" headers.
+- `AGENTS.md` is generated from `.agsync/instructions.md` + skill listing + scope cross-references. Agent-specific instruction files (CLAUDE.md, GEMINI.md, etc.) are symlinks to AGENTS.md, created only at the repo root.
+- Subfolders with `.agsync/instructions.md` or skills get their own `AGENTS.md` generated in-place (e.g. `frontend/AGENTS.md`). The root `AGENTS.md` references these: "When working in folder: `frontend` — you MUST load `frontend/AGENTS.md`".
+- `.agents/skills/` and `.agents/commands/` contain the canonical output with "managed by agsync" headers. Scoped items use double-dash directory names (e.g. `frontend--ui-kit`).
 - Agent skill/command directories (`.claude/skills/`, `.cursor/skills/`, etc.) are symlinks to `.agents/skills/` and `.agents/commands/`.
 - MCP configs are generated per-agent (JSON or TOML), merged with existing entries.
 

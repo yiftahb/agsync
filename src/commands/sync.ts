@@ -13,7 +13,7 @@ import { readLockFile, writeLockFile } from "@/lock/lock";
 import type {
   ResolvedSkill, SyncPlan, PlannedFile, PlannedSkill,
   ToolDefinition, AgentConfig, AgentMcpFeatureConfig, CommandDefinition,
-  GitignoreMode, ResolvedAgentConfig, LockFile,
+  GitignoreMode, ResolvedAgentConfig, LockFile, ScopedContent,
 } from "@/types";
 
 const MANAGED_HEADER = [
@@ -65,7 +65,8 @@ function buildOutputSkillMd(skill: ResolvedSkill, tools: ToolDefinition[]): stri
 
 function buildAgentsMd(
   userInstructions: string,
-  skills: ResolvedSkill[]
+  skills: ResolvedSkill[],
+  scopeRefs: string[] = []
 ): string {
   const lines: string[] = [];
 
@@ -104,9 +105,47 @@ function buildAgentsMd(
     }
   }
 
+  if (scopeRefs.length > 0) {
+    lines.push("");
+    lines.push("## Scoped Instructions");
+    lines.push("");
+    for (const ref of scopeRefs) {
+      lines.push(`- When working in folder: \`${ref}\` — you MUST load \`${ref}/AGENTS.md\``);
+    }
+  }
+
   lines.push("");
   lines.push("Skills are managed by agsync. Full definitions are in `.agents/skills/`.");
   lines.push("<!-- agsync:end -->");
+
+  return lines.join("\n") + "\n";
+}
+
+function buildScopedAgentsMd(
+  scope: ScopedContent,
+  skills: ResolvedSkill[]
+): string {
+  const lines: string[] = [];
+
+  lines.push(MANAGED_HEADER);
+
+  if (scope.instructions.trim()) {
+    lines.push(scope.instructions.trim());
+    lines.push("");
+  }
+
+  const scopeSkills = skills.filter((s) => s.scope === scope.scope);
+  if (scopeSkills.length > 0) {
+    lines.push("<!-- agsync:begin -->");
+    lines.push("## Available Skills");
+    lines.push("");
+    for (const skill of scopeSkills) {
+      lines.push(`- **${skill.name}**: ${skill.description}`);
+    }
+    lines.push("");
+    lines.push("Skills are managed by agsync. Full definitions are in `.agents/skills/`.");
+    lines.push("<!-- agsync:end -->");
+  }
 
   return lines.join("\n") + "\n";
 }
@@ -275,10 +314,15 @@ export async function buildSyncPlan(
     });
   }
 
+  const scopes = loaded.scopes ?? [];
+  const scopeRefs = scopes
+    .filter((s) => s.instructions.trim().length > 0 || s.skills.length > 0)
+    .map((s) => s.scope);
+
   const instructionsPath = resolve(baseDir, ".agsync", "instructions.md");
   const userInstructions = await readFileOrEmpty(instructionsPath);
   const agentsMdPath = resolve(gitRoot, "AGENTS.md");
-  const agentsMdContent = buildAgentsMd(userInstructions, resolvedSkills);
+  const agentsMdContent = buildAgentsMd(userInstructions, resolvedSkills, scopeRefs);
   const existingAgentsMd = await readFileOrEmpty(agentsMdPath);
   plannedFiles.push({
     path: agentsMdPath,
@@ -286,6 +330,19 @@ export async function buildSyncPlan(
     existing: existingAgentsMd,
     operation: !existingAgentsMd ? "create" : agentsMdContent !== existingAgentsMd ? "update" : "unchanged",
   });
+
+  for (const scope of scopes) {
+    if (!scope.instructions.trim() && scope.skills.length === 0) continue;
+    const scopeAgentsMdPath = resolve(scope.dir, "AGENTS.md");
+    const scopeContent = buildScopedAgentsMd(scope, resolvedSkills);
+    const existingScopeAgentsMd = await readFileOrEmpty(scopeAgentsMdPath);
+    plannedFiles.push({
+      path: scopeAgentsMdPath,
+      content: scopeContent,
+      existing: existingScopeAgentsMd,
+      operation: !existingScopeAgentsMd ? "create" : scopeContent !== existingScopeAgentsMd ? "update" : "unchanged",
+    });
+  }
 
   for (const [agentName, agentCfg] of Object.entries(agents)) {
     planAgentFeatures(agentName, agentCfg, gitRoot, agentsMdPath, canonicalSkillsDir, canonicalCommandsDir, tools, plannedFiles);
@@ -569,6 +626,13 @@ function collectGitignoreEntries(
   const entries = new Set<string>();
   entries.add("AGENTS.md");
   entries.add(".agents/");
+
+  for (const file of plan.files) {
+    if (file.path.endsWith("AGENTS.md") && !file.symlink) {
+      const rel = relative(process.cwd(), file.path);
+      entries.add(rel);
+    }
+  }
 
   for (const file of plan.files) {
     if (file.symlink || isMcpFile(file.path)) {

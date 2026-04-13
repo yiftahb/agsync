@@ -1,5 +1,6 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, readdir } from "node:fs/promises";
 import { resolve, dirname, basename } from "node:path";
+import { existsSync } from "node:fs";
 import { glob } from "glob";
 import { parse as parseYaml } from "yaml";
 import {
@@ -10,6 +11,7 @@ import { parseSkillMd } from "@/utils/github";
 import type {
   AgsyncConfig,
   LoadedConfig,
+  ScopedContent,
   SkillDefinition,
   CommandDefinition,
   ToolDefinition,
@@ -148,5 +150,111 @@ export async function loadFullConfig(configPath: string): Promise<LoadedConfig> 
     (data) => toolDefinitionSchema.parse(data)
   );
 
-  return { config, skills, commands, tools, configPath };
+  const scopes = await discoverScopes(baseDir);
+
+  return { config, skills, commands, tools, configPath, scopes };
+}
+
+export async function findNearestAgsyncDir(startDir: string): Promise<string | null> {
+  let current = resolve(startDir);
+  while (true) {
+    const candidate = resolve(current, ".agsync");
+    if (existsSync(candidate) && (await stat(candidate)).isDirectory()) {
+      return candidate;
+    }
+    const parent = dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
+export async function discoverAgsyncDirs(rootDir: string): Promise<string[]> {
+  const results: string[] = [];
+
+  async function walk(dir: string): Promise<void> {
+    const agsyncDir = resolve(dir, ".agsync");
+    if (existsSync(agsyncDir) && (await stat(agsyncDir)).isDirectory()) {
+      results.push(dir);
+    }
+    let entries: string[];
+    try {
+      entries = await readdir(dir);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.startsWith(".") || entry === "node_modules") continue;
+      const full = resolve(dir, entry);
+      if (await isDirectory(full)) {
+        await walk(full);
+      }
+    }
+  }
+
+  await walk(rootDir);
+  return results;
+}
+
+async function loadScopedContent(
+  scopeDir: string,
+  rootDir: string
+): Promise<ScopedContent | null> {
+  const agsyncDir = resolve(scopeDir, ".agsync");
+  const relative = scopeDir === rootDir
+    ? ""
+    : scopeDir.slice(rootDir.length + 1);
+
+  if (relative === "") return null;
+
+  let instructions = "";
+  const instructionsPath = resolve(agsyncDir, "instructions.md");
+  try {
+    instructions = await readFile(instructionsPath, "utf-8");
+  } catch {
+    // no instructions
+  }
+
+  const skillsDir = resolve(agsyncDir, "skills");
+  const skills = existsSync(skillsDir)
+    ? await loadSkillEntries(agsyncDir, [{ path: "skills/*" }])
+    : [];
+
+  for (const skill of skills) {
+    skill.scope = relative;
+  }
+
+  const commandsDir = resolve(agsyncDir, "commands");
+  const commands = existsSync(commandsDir)
+    ? await loadCommandEntries(agsyncDir, [{ path: "commands/*.md" }])
+    : [];
+
+  for (const cmd of commands) {
+    cmd.scope = relative;
+  }
+
+  const toolsDir = resolve(agsyncDir, "tools");
+  const tools = existsSync(toolsDir)
+    ? await loadYamlFiles<ToolDefinition>(agsyncDir, [{ path: "tools/*.yaml" }], (data) =>
+        toolDefinitionSchema.parse(data)
+      )
+    : [];
+
+  return {
+    scope: relative,
+    dir: scopeDir,
+    instructions,
+    skills,
+    commands,
+    tools,
+  };
+}
+
+async function discoverScopes(rootDir: string): Promise<ScopedContent[]> {
+  const dirs = await discoverAgsyncDirs(rootDir);
+  const scopes: ScopedContent[] = [];
+  for (const dir of dirs.sort()) {
+    const scoped = await loadScopedContent(dir, rootDir);
+    if (scoped) scopes.push(scoped);
+  }
+  return scopes;
 }

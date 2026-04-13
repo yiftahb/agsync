@@ -118,9 +118,9 @@ describe("runDoctor", () => {
     });
   });
 
-  it("reports hierarchy status", async () => {
+  it("reports .agsync/ directories status", async () => {
     const checks = await runDoctor(tempDir);
-    const hierarchyCheck = checks.find((c) => c.name === "Config hierarchy");
-    expect(hierarchyCheck).toBeDefined();
+    const dirCheck = checks.find((c) => c.name === ".agsync/ directories");
+    expect(dirCheck).toBeDefined();
   });
 });

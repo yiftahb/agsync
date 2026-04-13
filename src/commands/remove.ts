@@ -1,18 +1,21 @@
 import { rm, access } from "node:fs/promises";
-import { resolve, dirname } from "node:path";
-import { findNearestConfigFile } from "@/loader/config";
+import { resolve } from "node:path";
+import { findNearestAgsyncDir, findNearestConfigFile } from "@/loader/config";
+import { dirname } from "node:path";
 
-async function findBaseDir(targetDir: string): Promise<string> {
+async function resolveAgsyncDir(targetDir: string): Promise<string> {
+  const agsyncDir = await findNearestAgsyncDir(targetDir);
+  if (agsyncDir) return agsyncDir;
+
   const configPath = await findNearestConfigFile(targetDir);
-  if (!configPath) {
-    throw new Error("No agsync.yaml found. Run 'agsync init' first");
-  }
-  return dirname(configPath);
+  if (configPath) return resolve(dirname(configPath), ".agsync");
+
+  throw new Error("No .agsync/ directory or agsync.yaml found. Run 'agsync init' first");
 }
 
 export async function runRemove(targetDir: string, skillName: string): Promise<string> {
-  const baseDir = await findBaseDir(targetDir);
-  const skillDir = resolve(baseDir, ".agsync", "skills", skillName);
+  const agsyncDir = await resolveAgsyncDir(targetDir);
+  const skillDir = resolve(agsyncDir, "skills", skillName);
 
   try {
     await access(skillDir);
@@ -25,8 +28,8 @@ export async function runRemove(targetDir: string, skillName: string): Promise<s
 }
 
 export async function runRemoveCommand(targetDir: string, commandName: string): Promise<string> {
-  const baseDir = await findBaseDir(targetDir);
-  const cmdPath = resolve(baseDir, ".agsync", "commands", `${commandName}.md`);
+  const agsyncDir = await resolveAgsyncDir(targetDir);
+  const cmdPath = resolve(agsyncDir, "commands", `${commandName}.md`);
 
   try {
     await access(cmdPath);
@@ -39,8 +42,8 @@ export async function runRemoveCommand(targetDir: string, commandName: string): 
 }
 
 export async function runRemoveTool(targetDir: string, toolName: string): Promise<string> {
-  const baseDir = await findBaseDir(targetDir);
-  const toolPath = resolve(baseDir, ".agsync", "tools", `${toolName}.yaml`);
+  const agsyncDir = await resolveAgsyncDir(targetDir);
+  const toolPath = resolve(agsyncDir, "tools", `${toolName}.yaml`);
 
   try {
     await access(toolPath);

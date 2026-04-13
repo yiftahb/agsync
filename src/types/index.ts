@@ -126,12 +126,22 @@ export interface ResolvedAgentConfig {
   [agentName: string]: AgentConfig;
 }
 
+export interface ScopedContent {
+  scope: string;
+  dir: string;
+  instructions: string;
+  skills: SkillDefinition[];
+  commands: CommandDefinition[];
+  tools: ToolDefinition[];
+}
+
 export interface LoadedConfig {
   config: AgsyncConfig;
   skills: SkillDefinition[];
   commands: CommandDefinition[];
   tools: ToolDefinition[];
   configPath: string;
+  scopes: ScopedContent[];
 }
 
 export interface ResolvedConfig {

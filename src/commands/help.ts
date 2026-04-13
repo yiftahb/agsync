@@ -44,18 +44,13 @@ COMMON WORKFLOWS
     agsync sync
 
   Add a command (slash command):
-    # Create .agsync/commands/deploy.md with the command instructions
+    agsync command add deploy
+    # Edit .agsync/commands/deploy.md with the command instructions
     agsync sync
 
-  Add an MCP server:
-    # Create .agsync/tools/github.yaml:
-    #   name: github
-    #   type: mcp
-    #   command: npx
-    #   args: ["-y", "@modelcontextprotocol/server-github"]
-    #   env:
-    #     GITHUB_PERSONAL_ACCESS_TOKEN: $GITHUB_PERSONAL_ACCESS_TOKEN
-    export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxx
+  Add an MCP tool:
+    agsync tool add github
+    # Edit .agsync/tools/github.yaml with server config
     agsync sync
 
 SKILL FORMAT
@@ -180,13 +175,17 @@ GITIGNORE MANAGEMENT
     off       Do not manage .gitignore at all
 
 MONOREPO SCOPING
-  When agsync runs in a subfolder with its own agsync.yaml, child skills and
-  commands are automatically scoped and output to the git root.
+  One agsync.yaml lives at the repo root. Subfolders can each have their
+  own .agsync/ directory with skills, commands, tools, and instructions.
+  All output builds to the git root.
 
   Example:
     project/                          ← git root, agsync.yaml
-    ├── frontend/                     ← child agsync.yaml
-    │   └── .agsync/skills/ui-kit/
+    ├── .agsync/                      ← root definitions
+    ├── frontend/
+    │   └── .agsync/                  ← subfolder definitions
+    │       ├── instructions.md       → generates frontend/AGENTS.md
+    │       └── skills/ui-kit/
     └── .agents/skills/
         ├── shared-skill/             ← root skill (no scope)
         └── frontend--ui-kit/         ← scoped skill
@@ -195,19 +194,29 @@ MONOREPO SCOPING
     Metadata name       frontend:ui-kit       (colon separator)
     Directory name      frontend--ui-kit      (double-dash, filesystem-safe)
 
-  Generated SKILL.md files include a scope: field in frontmatter and a
-  prominent warning so agents only apply them within the correct subfolder.
-  AGENTS.md groups scoped skills under their scope heading.
+  Per-scope AGENTS.md:
+    Each subfolder with .agsync/instructions.md or skills gets its own
+    AGENTS.md generated in-place (e.g. frontend/AGENTS.md).
+    The root AGENTS.md references these with:
+      "When working in folder: frontend — you MUST load frontend/AGENTS.md"
+
+  Agent symlinks (CLAUDE.md, .claude/skills/) are only created at the root.
+  Scoped SKILL.md files include a scope: field and a warning so agents
+  only apply them within the correct subfolder.
+
+  The add/remove commands resolve the nearest .agsync/ directory upwards,
+  so running from frontend/ adds to frontend/.agsync/.
 
 GENERATED OUTPUT
-  AGENTS.md                         Generated instructions + skill listing
+  AGENTS.md                         Root instructions + skill listing + scope refs
+  subfolder/AGENTS.md               Per-scope instructions (if .agsync/ exists)
   .agents/skills/*/SKILL.md         Canonical skill output
   .agents/skills/scope--name/       Scoped skill from a subfolder
   .agents/commands/*.md             Canonical command output
-  CLAUDE.md                         Symlink → AGENTS.md
-  GEMINI.md                         Symlink → AGENTS.md
-  .claude/skills/                   Symlink → .agents/skills/
-  .cursor/skills/                   Symlink → .agents/skills/
+  CLAUDE.md                         Symlink → AGENTS.md (root only)
+  GEMINI.md                         Symlink → AGENTS.md (root only)
+  .claude/skills/                   Symlink → .agents/skills/ (root only)
+  .cursor/skills/                   Symlink → .agents/skills/ (root only)
   .claude/settings.json             Generated MCP config
   .cursor/mcp.json                  Generated MCP config
   .codex/config.toml                Generated MCP config (TOML)

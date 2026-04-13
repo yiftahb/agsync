@@ -47,7 +47,7 @@ npx agsync-cli
 
 🔌 **MCP Sync** — Define MCP servers in YAML, expand environment variables at sync time, and generate the correct config format (JSON or TOML) per agent with smart merging.
 
-📁 **Monorepo Scoping** — Run `agsync` from any subfolder in a monorepo. Child skills and commands are automatically prefixed (e.g. `frontend:my-skill`) and output to the repo root with scope warnings injected so agents only apply them in the right context.
+📁 **Monorepo Scoping** — One `agsync.yaml` at the repo root, with `.agsync/` directories in any subfolder. Skills and commands are automatically prefixed (e.g. `frontend:my-skill`), built to the root, and each subfolder gets its own `AGENTS.md` with scoped instructions.
 
 🔒 **Gitignore Management** — Automatically manage `.gitignore` entries for generated output. Choose between `on` (all output), `mcpOnly` (default, MCP configs only), or `off`.
 
@@ -56,15 +56,44 @@ npx agsync-cli
 | Command | Description |
 |---------|-------------|
 | `agsync init` | Scaffold a new project with `agsync.yaml` and `.agsync/` |
-| `agsync skill add <source> [name]` | Import a skill from GitHub or ClawHub |
+| `agsync skill add <name>` | Create a local empty skill |
+| `agsync skill add github:<org/repo/path@ver>` | Import a skill from GitHub |
+| `agsync skill add clawhub:<slug@ver>` | Import a skill from ClawHub |
 | `agsync skill remove <name>` | Remove a skill |
+| `agsync command add <name>` | Create a new command (.md) |
+| `agsync command remove <name>` | Remove a command |
+| `agsync tool add <name>` | Create a new tool definition (.yaml) |
+| `agsync tool remove <name>` | Remove a tool |
 | `agsync validate` | Validate config, skills, commands, and tool references |
-| `agsync plan` | Preview changes without writing files |
+| `agsync plan [--frozen]` | Preview changes without writing files |
 | `agsync sync [--frozen]` | Generate output for all enabled agents |
 | `agsync doctor` | Check environment health and enabled agents |
 | `agsync version` | Show current version and check for updates |
 | `agsync update` | Update to the latest version |
 | `agsync help` | Show extended help |
+
+## Monorepo Support
+
+One `agsync.yaml` at the repo root, multiple `.agsync/` directories in subfolders:
+
+```
+project/
+├── agsync.yaml              ← single config
+├── .agsync/                 ← root skills, commands, tools
+├── frontend/
+│   └── .agsync/             ← frontend-specific definitions
+│       ├── instructions.md  → generates frontend/AGENTS.md
+│       └── skills/ui-kit/
+└── backend/
+    └── .agsync/
+        └── skills/api/
+```
+
+- Scoped skills are prefixed automatically (`frontend:ui-kit`) and output to `.agents/skills/frontend--ui-kit/` at the root
+- Each subfolder with `.agsync/instructions.md` gets its own `AGENTS.md` generated in-place
+- The root `AGENTS.md` cross-references scoped instructions: *"When working in folder: `frontend` — you MUST load `frontend/AGENTS.md`"*
+- Agent symlinks (`CLAUDE.md`, `.claude/skills/`) are only created at the root
+- `agsync skill add`, `command add`, `tool add` resolve the nearest `.agsync/` upwards, so running from `frontend/` adds to `frontend/.agsync/`
 
 ## License
 

@@ -48,7 +48,7 @@ describe("runRemove (skills)", () => {
     await expect(runRemove(tempDir, "nonexistent")).rejects.toThrow(/not found/);
   });
 
-  it("finds nearest config from subdirectory", async () => {
+  it("finds nearest .agsync/ from subdirectory", async () => {
     await setupConfig(tempDir);
     const skillDir = join(tempDir, ".agsync", "skills", "test-skill");
     await mkdir(skillDir, { recursive: true });
@@ -58,6 +58,17 @@ describe("runRemove (skills)", () => {
     await mkdir(subDir, { recursive: true });
 
     await runRemove(subDir, "test-skill");
+    await expect(access(skillDir)).rejects.toThrow();
+  });
+
+  it("removes from subfolder .agsync/ when present", async () => {
+    await setupConfig(tempDir);
+    const subDir = join(tempDir, "frontend");
+    const skillDir = join(subDir, ".agsync", "skills", "ui-skill");
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(join(skillDir, "SKILL.md"), "---\nname: ui-skill\n---\n");
+
+    await runRemove(subDir, "ui-skill");
     await expect(access(skillDir)).rejects.toThrow();
   });
 });

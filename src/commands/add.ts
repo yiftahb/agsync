@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { stringify as toYaml } from "yaml";
-import { findNearestConfigFile } from "@/loader/config";
+import { findNearestAgsyncDir, findNearestConfigFile } from "@/loader/config";
 import { getRegistry } from "@/registries/index";
 import { parseSkillMd } from "@/utils/github";
 import { writeLockFile, readLockFile } from "@/lock/lock";
@@ -68,21 +68,27 @@ function parseSource(ref: string, nameOverride: string): ParsedRef {
   return { source: null, name: nameOverride || ref };
 }
 
+async function resolveAgsyncDir(targetDir: string): Promise<string> {
+  const agsyncDir = await findNearestAgsyncDir(targetDir);
+  if (agsyncDir) return agsyncDir;
+
+  const configPath = await findNearestConfigFile(targetDir);
+  if (configPath) return resolve(dirname(configPath), ".agsync");
+
+  throw new Error("No .agsync/ directory or agsync.yaml found. Run 'agsync init' first");
+}
+
 export async function runAdd(
   targetDir: string,
   ref: string,
   skillName: string
 ): Promise<string[]> {
-  const configPath = await findNearestConfigFile(targetDir);
-  if (!configPath) {
-    throw new Error("No agsync.yaml found. Run 'agsync init' first");
-  }
-
-  const baseDir = dirname(configPath);
+  const agsyncDir = await resolveAgsyncDir(targetDir);
+  const baseDir = dirname(agsyncDir);
   const { source: partialSource, name } = parseSource(ref, skillName);
 
   if (!partialSource) {
-    const localSkillDir = resolve(baseDir, ".agsync", "skills", name);
+    const localSkillDir = resolve(agsyncDir, "skills", name);
     await mkdir(localSkillDir, { recursive: true });
     const skillMdPath = resolve(localSkillDir, "SKILL.md");
     await writeFile(skillMdPath, buildSkillMd({ name, description: "" }), "utf-8");
@@ -106,7 +112,7 @@ export async function runAdd(
     source = { registry: "github", org: partialSource.org!, repo: partialSource.repo!, path: partialSource.path!, version };
   }
 
-  const localSkillDir = resolve(baseDir, ".agsync", "skills", name);
+  const localSkillDir = resolve(agsyncDir, "skills", name);
   await mkdir(localSkillDir, { recursive: true });
 
   const fetched = await registry.fetch(source);
@@ -159,13 +165,8 @@ export async function runAddCommand(
   targetDir: string,
   commandName: string
 ): Promise<string> {
-  const configPath = await findNearestConfigFile(targetDir);
-  if (!configPath) {
-    throw new Error("No agsync.yaml found. Run 'agsync init' first");
-  }
-
-  const baseDir = dirname(configPath);
-  const cmdDir = resolve(baseDir, ".agsync", "commands");
+  const agsyncDir = await resolveAgsyncDir(targetDir);
+  const cmdDir = resolve(agsyncDir, "commands");
   await mkdir(cmdDir, { recursive: true });
   const cmdPath = resolve(cmdDir, `${commandName}.md`);
   await writeFile(cmdPath, `# ${commandName}\n\nDescribe what this command does.\n`, "utf-8");
@@ -176,13 +177,8 @@ export async function runAddTool(
   targetDir: string,
   toolName: string
 ): Promise<string> {
-  const configPath = await findNearestConfigFile(targetDir);
-  if (!configPath) {
-    throw new Error("No agsync.yaml found. Run 'agsync init' first");
-  }
-
-  const baseDir = dirname(configPath);
-  const toolsDir = resolve(baseDir, ".agsync", "tools");
+  const agsyncDir = await resolveAgsyncDir(targetDir);
+  const toolsDir = resolve(agsyncDir, "tools");
   await mkdir(toolsDir, { recursive: true });
   const toolPath = resolve(toolsDir, `${toolName}.yaml`);
   await writeFile(

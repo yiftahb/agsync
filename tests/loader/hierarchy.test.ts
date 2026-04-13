@@ -2,8 +2,7 @@ import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { stringify as toYaml } from "yaml";
-import { collectConfigChain, loadHierarchicalConfig } from "@/loader/hierarchy";
-import type { UserAgentConfig } from "@/types";
+import { loadHierarchicalConfig } from "@/loader/hierarchy";
 
 let tempDir: string;
 
@@ -20,61 +19,6 @@ function skillMd(frontmatter: Record<string, unknown>, body: string): string {
   return `---\n${toYaml(frontmatter).trim()}\n---\n\n${body.trim()}\n`;
 }
 
-describe("collectConfigChain", () => {
-  it("finds single config at root", async () => {
-    await writeFile(
-      join(tempDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        agents: { codex: { instructions: { enabled: true } } },
-        skills: [],
-        commands: [],
-        tools: [],
-      })
-    );
-
-    const chain = await collectConfigChain(tempDir);
-    expect(chain).toHaveLength(1);
-    expect(chain[0]).toBe(join(tempDir, "agsync.yaml"));
-  });
-
-  it("finds configs at multiple levels", async () => {
-    await writeFile(
-      join(tempDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        agents: { codex: { instructions: { enabled: true } } },
-        skills: [],
-        commands: [],
-        tools: [],
-      })
-    );
-
-    const childDir = join(tempDir, "apps", "api");
-    await mkdir(childDir, { recursive: true });
-    await writeFile(
-      join(childDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        agents: { cursor: { mcp: { enabled: true } } },
-        skills: [],
-        commands: [],
-        tools: [],
-      })
-    );
-
-    const chain = await collectConfigChain(childDir);
-    expect(chain).toHaveLength(2);
-    expect(chain[0]).toBe(join(tempDir, "agsync.yaml"));
-    expect(chain[1]).toBe(join(childDir, "agsync.yaml"));
-  });
-
-  it("returns empty when no config exists", async () => {
-    const chain = await collectConfigChain(tempDir);
-    expect(chain).toHaveLength(0);
-  });
-});
-
 describe("findGitRoot", () => {
   it("is exported", async () => {
     const { findGitRoot } = await import("@/loader/hierarchy");
@@ -84,176 +28,55 @@ describe("findGitRoot", () => {
 });
 
 describe("loadHierarchicalConfig", () => {
-  it("merges parent and child skills and concatenates skill lists", async () => {
-    await mkdir(join(tempDir, "skills", "root-skill"), { recursive: true });
+  it("loads single root config with root .agsync/ skills", async () => {
+    await mkdir(join(tempDir, ".agsync", "skills", "root-skill"), { recursive: true });
     await writeFile(
       join(tempDir, "agsync.yaml"),
       toYaml({
         version: "1",
         agents: { codex: { instructions: { enabled: true } } },
-        skills: [{ path: "skills/*" }],
+        skills: [{ path: ".agsync/skills/*" }],
         commands: [],
         tools: [],
       })
     );
     await writeFile(
-      join(tempDir, "skills", "root-skill", "SKILL.md"),
-      skillMd(
-        { name: "root-skill", description: "Root" },
-        "Root instructions"
-      )
+      join(tempDir, ".agsync", "skills", "root-skill", "SKILL.md"),
+      skillMd({ name: "root-skill", description: "Root" }, "Root instructions")
     );
 
-    const childDir = join(tempDir, "apps", "api");
-    await mkdir(join(childDir, "skills", "child-skill"), { recursive: true });
-    await writeFile(
-      join(childDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        agents: { codex: { skills: { enabled: true } } },
-        skills: [{ path: "skills/*" }],
-        commands: [],
-        tools: [],
-      })
-    );
-    await writeFile(
-      join(childDir, "skills", "child-skill", "SKILL.md"),
-      skillMd(
-        { name: "child-skill", description: "Child" },
-        "Child instructions"
-      )
-    );
-
-    const result = await loadHierarchicalConfig(childDir);
-    expect(result).not.toBeNull();
-    expect(result!.config.agents.codex?.instructions?.enabled).toBe(true);
-    expect(result!.config.agents.codex?.skills?.enabled).toBe(true);
-    expect(result!.skills).toHaveLength(2);
-    expect(result!.skills.map((s) => s.name)).toEqual(["root-skill", "apps/api:child-skill"]);
-  });
-
-  it("deep-merges agents so child feature fields override parent per agent", async () => {
-    const parentClaude: Partial<UserAgentConfig> = {
-      instructions: { enabled: false, destination: "/parent/docs", merge_strategy: "merge" },
-      mcp: { enabled: true, destination: "/parent/mcp" },
-    };
-    const childClaude: Partial<UserAgentConfig> = {
-      instructions: { enabled: true },
-    };
-
-    await writeFile(
-      join(tempDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        agents: { claude: parentClaude },
-        skills: [],
-        commands: [],
-        tools: [],
-      })
-    );
-
-    const childDir = join(tempDir, "pkg");
-    await mkdir(childDir, { recursive: true });
-    await writeFile(
-      join(childDir, "agsync.yaml"),
-      toYaml({
-        version: "2",
-        agents: { claude: childClaude },
-        skills: [],
-        commands: [],
-        tools: [],
-      })
-    );
-
-    const result = await loadHierarchicalConfig(childDir);
-    expect(result).not.toBeNull();
-    expect(result!.config.version).toBe("2");
-    const merged = result!.config.agents.claude;
-    expect(merged?.instructions).toEqual({
-      enabled: true,
-      destination: "/parent/docs",
-      merge_strategy: "merge",
-    });
-    expect(merged?.mcp).toEqual({ enabled: true, destination: "/parent/mcp" });
-  });
-
-  it("returns null when no config found", async () => {
     const result = await loadHierarchicalConfig(tempDir);
-    expect(result).toBeNull();
-  });
-
-  it("merges features — child enables a feature that parent left off", async () => {
-    await writeFile(
-      join(tempDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        features: { instructions: false, skills: true, commands: false, mcp: false },
-        agents: {},
-        skills: [],
-        commands: [],
-        tools: [],
-      })
-    );
-
-    const childDir = join(tempDir, "pkg");
-    await mkdir(childDir, { recursive: true });
-    await writeFile(
-      join(childDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        features: { instructions: true, skills: false, commands: false, mcp: true },
-        agents: {},
-        skills: [],
-        commands: [],
-        tools: [],
-      })
-    );
-
-    const result = await loadHierarchicalConfig(childDir);
     expect(result).not.toBeNull();
-    expect(result!.config.features).toEqual({
-      instructions: true,
-      skills: true,
-      commands: false,
-      mcp: true,
-    });
+    expect(result!.skills).toHaveLength(1);
+    expect(result!.skills[0].name).toBe("root-skill");
+    expect(result!.skills[0].scope).toBeUndefined();
   });
 
-  it("scopes child skills with prefix and sourceDir", async () => {
-    await mkdir(join(tempDir, "skills", "root-skill"), { recursive: true });
+  it("discovers subfolder .agsync/ and scopes skills with prefix", async () => {
+    await mkdir(join(tempDir, ".agsync", "skills", "root-skill"), { recursive: true });
     await writeFile(
       join(tempDir, "agsync.yaml"),
       toYaml({
         version: "1",
         agents: {},
-        skills: [{ path: "skills/*" }],
+        skills: [{ path: ".agsync/skills/*" }],
         commands: [],
         tools: [],
       })
     );
     await writeFile(
-      join(tempDir, "skills", "root-skill", "SKILL.md"),
+      join(tempDir, ".agsync", "skills", "root-skill", "SKILL.md"),
       skillMd({ name: "root-skill", description: "Root" }, "Root body")
     );
 
     const childDir = join(tempDir, "frontend");
-    await mkdir(join(childDir, "skills", "ui-kit"), { recursive: true });
+    await mkdir(join(childDir, ".agsync", "skills", "ui-kit"), { recursive: true });
     await writeFile(
-      join(childDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        agents: {},
-        skills: [{ path: "skills/*" }],
-        commands: [],
-        tools: [],
-      })
-    );
-    await writeFile(
-      join(childDir, "skills", "ui-kit", "SKILL.md"),
+      join(childDir, ".agsync", "skills", "ui-kit", "SKILL.md"),
       skillMd({ name: "ui-kit", description: "UI components" }, "UI body")
     );
 
-    const result = await loadHierarchicalConfig(childDir);
+    const result = await loadHierarchicalConfig(tempDir);
     expect(result).not.toBeNull();
     expect(result!.skills).toHaveLength(2);
 
@@ -263,11 +86,11 @@ describe("loadHierarchicalConfig", () => {
 
     const childSkill = result!.skills.find((s) => s.name === "frontend:ui-kit");
     expect(childSkill).toBeDefined();
-    expect(childSkill!.scope).toBe("frontend/");
+    expect(childSkill!.scope).toBe("frontend");
     expect(childSkill!.sourceDir).toContain(join("frontend", ".agsync", "skills", "ui-kit"));
   });
 
-  it("scopes child commands with prefix", async () => {
+  it("scopes subfolder commands with prefix", async () => {
     await writeFile(
       join(tempDir, "agsync.yaml"),
       toYaml({
@@ -280,32 +103,21 @@ describe("loadHierarchicalConfig", () => {
     );
 
     const childDir = join(tempDir, "backend");
-    await mkdir(join(childDir, "cmds"), { recursive: true });
-    await writeFile(
-      join(childDir, "agsync.yaml"),
-      toYaml({
-        version: "1",
-        agents: {},
-        skills: [],
-        commands: [{ path: "cmds/*.md" }],
-        tools: [],
-      })
-    );
-    await writeFile(join(childDir, "cmds", "deploy.md"), "Deploy the backend");
+    await mkdir(join(childDir, ".agsync", "commands"), { recursive: true });
+    await writeFile(join(childDir, ".agsync", "commands", "deploy.md"), "Deploy the backend");
 
-    const result = await loadHierarchicalConfig(childDir);
+    const result = await loadHierarchicalConfig(tempDir);
     expect(result).not.toBeNull();
     const cmd = result!.commands.find((c) => c.name === "backend:deploy");
     expect(cmd).toBeDefined();
-    expect(cmd!.scope).toBe("backend/");
+    expect(cmd!.scope).toBe("backend");
   });
 
-  it("merges gitignore — child overrides parent", async () => {
+  it("collects tools from subfolder .agsync/", async () => {
     await writeFile(
       join(tempDir, "agsync.yaml"),
       toYaml({
         version: "1",
-        gitignore: "off",
         agents: {},
         skills: [],
         commands: [],
@@ -313,22 +125,64 @@ describe("loadHierarchicalConfig", () => {
       })
     );
 
-    const childDir = join(tempDir, "pkg");
-    await mkdir(childDir, { recursive: true });
+    const childDir = join(tempDir, "services");
+    await mkdir(join(childDir, ".agsync", "tools"), { recursive: true });
     await writeFile(
-      join(childDir, "agsync.yaml"),
+      join(childDir, ".agsync", "tools", "db.yaml"),
+      toYaml({ name: "db", description: "Database tool", type: "mcp", command: "db-server" })
+    );
+
+    const result = await loadHierarchicalConfig(tempDir);
+    expect(result).not.toBeNull();
+    expect(result!.tools).toHaveLength(1);
+    expect(result!.tools[0].name).toBe("db");
+  });
+
+  it("populates scopes array with subfolder content", async () => {
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
       toYaml({
         version: "1",
-        gitignore: "on",
         agents: {},
         skills: [],
         commands: [],
         tools: [],
       })
     );
+
+    const childDir = join(tempDir, "frontend");
+    await mkdir(join(childDir, ".agsync"), { recursive: true });
+    await writeFile(join(childDir, ".agsync", "instructions.md"), "Frontend instructions");
+
+    const result = await loadHierarchicalConfig(tempDir);
+    expect(result).not.toBeNull();
+    expect(result!.scopes).toHaveLength(1);
+    expect(result!.scopes[0].scope).toBe("frontend");
+    expect(result!.scopes[0].instructions).toBe("Frontend instructions");
+  });
+
+  it("returns null when no config found", async () => {
+    const result = await loadHierarchicalConfig(tempDir);
+    expect(result).toBeNull();
+  });
+
+  it("finds config from subdirectory", async () => {
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        agents: {},
+        skills: [],
+        commands: [],
+        tools: [],
+      })
+    );
+
+    const childDir = join(tempDir, "packages", "core");
+    await mkdir(childDir, { recursive: true });
 
     const result = await loadHierarchicalConfig(childDir);
     expect(result).not.toBeNull();
-    expect(result!.config.gitignore).toBe("on");
+    expect(result!.config.version).toBe("1");
   });
 });
