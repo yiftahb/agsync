@@ -1,4 +1,7 @@
-import { expandEnvValue, expandToolEnv, findEnvReferences } from "@/utils/env";
+import { expandEnvValue, expandToolEnv, findEnvReferences, parseDotEnv, loadDotEnv } from "@/utils/env";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import type { ToolDefinition } from "@/types";
 
 describe("expandEnvValue", () => {
@@ -145,5 +148,80 @@ describe("findEnvReferences", () => {
       { name: "t", description: "d", type: "mcp", env: { DEBUG: "true" } },
     ];
     expect(findEnvReferences(tools)).toEqual([]);
+  });
+});
+
+describe("parseDotEnv", () => {
+  it("parses simple KEY=VALUE pairs", () => {
+    expect(parseDotEnv("FOO=bar\nBAZ=qux")).toEqual({ FOO: "bar", BAZ: "qux" });
+  });
+
+  it("ignores comments and blank lines", () => {
+    const content = "# comment\n\nKEY=val\n  # another comment\n";
+    expect(parseDotEnv(content)).toEqual({ KEY: "val" });
+  });
+
+  it("strips double quotes from values", () => {
+    expect(parseDotEnv('KEY="hello world"')).toEqual({ KEY: "hello world" });
+  });
+
+  it("strips single quotes from values", () => {
+    expect(parseDotEnv("KEY='hello world'")).toEqual({ KEY: "hello world" });
+  });
+
+  it("handles values with = signs", () => {
+    expect(parseDotEnv("URL=postgres://host:5432/db?opt=1")).toEqual({
+      URL: "postgres://host:5432/db?opt=1",
+    });
+  });
+
+  it("handles empty values", () => {
+    expect(parseDotEnv("EMPTY=")).toEqual({ EMPTY: "" });
+  });
+
+  it("ignores lines without =", () => {
+    expect(parseDotEnv("INVALID_LINE")).toEqual({});
+  });
+});
+
+describe("loadDotEnv", () => {
+  let tmpDir: string;
+  const savedEnv: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "env-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+    for (const [key, val] of Object.entries(savedEnv)) {
+      if (val === undefined) delete process.env[key];
+      else process.env[key] = val;
+    }
+  });
+
+  it("loads .env into process.env", () => {
+    savedEnv.DOTENV_TEST_A = process.env.DOTENV_TEST_A;
+    delete process.env.DOTENV_TEST_A;
+
+    writeFileSync(join(tmpDir, ".env"), "DOTENV_TEST_A=from_file");
+    const vars = loadDotEnv(tmpDir);
+
+    expect(vars).toEqual({ DOTENV_TEST_A: "from_file" });
+    expect(process.env.DOTENV_TEST_A).toBe("from_file");
+  });
+
+  it("does not overwrite existing process.env values", () => {
+    savedEnv.DOTENV_TEST_B = process.env.DOTENV_TEST_B;
+    process.env.DOTENV_TEST_B = "original";
+
+    writeFileSync(join(tmpDir, ".env"), "DOTENV_TEST_B=overridden");
+    loadDotEnv(tmpDir);
+
+    expect(process.env.DOTENV_TEST_B).toBe("original");
+  });
+
+  it("returns empty object when no .env exists", () => {
+    expect(loadDotEnv(tmpDir)).toEqual({});
   });
 });

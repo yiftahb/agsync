@@ -1,6 +1,48 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { ToolDefinition, EnvWarning, EnvReference } from "@/types";
 
 const ENV_VAR_REGEX = /\$\{([^}]+)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g;
+
+export function parseDotEnv(content: string): Record<string, string> {
+  const vars: Record<string, string> = {};
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx === -1) continue;
+
+    const key = trimmed.slice(0, eqIdx).trim();
+    let value = trimmed.slice(eqIdx + 1).trim();
+
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    vars[key] = value;
+  }
+  return vars;
+}
+
+export function loadDotEnv(dir: string): Record<string, string> {
+  const envPath = resolve(dir, ".env");
+  try {
+    const content = readFileSync(envPath, "utf-8");
+    const vars = parseDotEnv(content);
+    for (const [key, value] of Object.entries(vars)) {
+      if (process.env[key] === undefined) {
+        process.env[key] = value;
+      }
+    }
+    return vars;
+  } catch {
+    return {};
+  }
+}
 
 export function expandEnvValue(value: string): { result: string; missing: string[] } {
   if (!value.includes("$")) return { result: value, missing: [] };

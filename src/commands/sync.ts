@@ -8,7 +8,7 @@ import { loadHierarchicalConfig, findGitRoot } from "@/loader/hierarchy";
 import { resolveAllSkills } from "@/resolver/skills";
 import { resolveAgentConfig } from "@/agents/registry";
 import { runValidate } from "@/commands/validate";
-import { expandToolEnv } from "@/utils/env";
+import { expandToolEnv, loadDotEnv } from "@/utils/env";
 import { readLockFile, writeLockFile } from "@/lock/lock";
 import type {
   ResolvedSkill, SyncPlan, PlannedFile, PlannedSkill,
@@ -255,6 +255,8 @@ export async function buildSyncPlan(
   const skillsDir = resolve(baseDir, ".agsync", "skills");
   const resolveResult = await resolveAllSkills(loaded.skills, skillsDir, { lock, frozen });
   const resolvedSkills = resolveResult.skills;
+
+  loadDotEnv(baseDir);
 
   let tools = loaded.tools;
   const warnings: string[] = [];
