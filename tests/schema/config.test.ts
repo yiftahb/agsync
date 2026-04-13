@@ -6,7 +6,7 @@ import {
   skillDefinitionSchema,
   skillMdFrontmatterSchema,
   skillSourceSchema,
-  toolDefinitionSchema,
+  mcpDefinitionSchema,
 } from "@/schema/config";
 
 describe("pathRefSchema", () => {
@@ -72,14 +72,14 @@ describe("agsyncConfigSchema", () => {
       },
       skills: [{ path: ".agsync/skills/**/SKILL.md" }],
       commands: [{ path: ".agsync/commands/*.md" }],
-      tools: [{ path: ".agsync/tools/*.yaml" }],
+      mcp: [{ path: ".agsync/mcp/*.yaml" }],
     };
     const result = agsyncConfigSchema.parse(input);
     expect(result.version).toBe("2");
     expect(result.agents.claude?.skills?.enabled).toBe(true);
     expect(result.skills).toHaveLength(1);
     expect(result.commands).toHaveLength(1);
-    expect(result.tools).toHaveLength(1);
+    expect(result.mcp).toHaveLength(1);
   });
 
   it("applies defaults for version, agents, features, gitignore, and path arrays", () => {
@@ -88,7 +88,7 @@ describe("agsyncConfigSchema", () => {
     expect(result.agents).toEqual({});
     expect(result.skills).toEqual([]);
     expect(result.commands).toEqual([]);
-    expect(result.tools).toEqual([]);
+    expect(result.mcp).toEqual([]);
     expect(result.features).toEqual({
       instructions: false,
       skills: false,
@@ -232,7 +232,7 @@ describe("skillDefinitionSchema", () => {
   });
 });
 
-describe("toolDefinitionSchema", () => {
+describe("mcpDefinitionSchema", () => {
   it("parses an MCP tool", () => {
     const input = {
       name: "my-server",
@@ -242,7 +242,7 @@ describe("toolDefinitionSchema", () => {
       args: ["server.js"],
       env: { API_KEY: "ref:secret" },
     };
-    const result = toolDefinitionSchema.parse(input);
+    const result = mcpDefinitionSchema.parse(input);
     expect(result.type).toBe("mcp");
     expect(result.args).toEqual(["server.js"]);
   });
@@ -254,7 +254,7 @@ describe("toolDefinitionSchema", () => {
       type: "cli",
       command: "grep",
     };
-    const result = toolDefinitionSchema.parse(input);
+    const result = mcpDefinitionSchema.parse(input);
     expect(result.type).toBe("cli");
   });
 
@@ -264,12 +264,12 @@ describe("toolDefinitionSchema", () => {
       description: "Built-in filesystem",
       type: "builtin",
     };
-    expect(toolDefinitionSchema.parse(input).type).toBe("builtin");
+    expect(mcpDefinitionSchema.parse(input).type).toBe("builtin");
   });
 
   it("rejects unknown type", () => {
     expect(() =>
-      toolDefinitionSchema.parse({ name: "x", description: "x", type: "unknown" })
+      mcpDefinitionSchema.parse({ name: "x", description: "x", type: "unknown" })
     ).toThrow();
   });
 });

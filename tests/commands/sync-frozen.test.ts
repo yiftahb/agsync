@@ -33,7 +33,7 @@ async function setupProject(dir: string) {
       agents: {},
       skills: [{ path: ".agsync/skills/*" }],
       commands: [],
-      tools: [],
+      mcp: [],
     })
   );
 }

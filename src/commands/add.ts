@@ -178,9 +178,9 @@ export async function runAddTool(
   toolName: string
 ): Promise<string> {
   const agsyncDir = await resolveAgsyncDir(targetDir);
-  const toolsDir = resolve(agsyncDir, "tools");
-  await mkdir(toolsDir, { recursive: true });
-  const toolPath = resolve(toolsDir, `${toolName}.yaml`);
+  const mcpDir = resolve(agsyncDir, "mcp");
+  await mkdir(mcpDir, { recursive: true });
+  const toolPath = resolve(mcpDir, `${toolName}.yaml`);
   await writeFile(
     toolPath,
     toYaml({ name: toolName, description: "", type: "mcp", command: "", args: [] }),

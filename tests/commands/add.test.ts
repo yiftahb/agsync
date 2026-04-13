@@ -20,7 +20,7 @@ afterEach(async () => {
 
 async function setupConfig(dir: string) {
   await mkdir(join(dir, ".agsync", "skills"), { recursive: true });
-  await mkdir(join(dir, ".agsync", "tools"), { recursive: true });
+  await mkdir(join(dir, ".agsync", "mcp"), { recursive: true });
   await writeFile(
     join(dir, "agsync.yaml"),
     toYaml({
@@ -29,7 +29,7 @@ async function setupConfig(dir: string) {
       agents: {},
       skills: [{ path: ".agsync/skills/*" }],
       commands: [],
-      tools: [],
+      mcp: [],
     })
   );
 }
@@ -213,7 +213,7 @@ describe("runAddTool", () => {
     await mkdir(subDir, { recursive: true });
 
     const file = await runAddTool(subDir, "my-tool");
-    expect(file).toContain(join(tempDir, ".agsync", "tools", "my-tool.yaml"));
+    expect(file).toContain(join(tempDir, ".agsync", "mcp", "my-tool.yaml"));
   });
 
   it("adds to subfolder .agsync/ when present", async () => {
@@ -222,7 +222,7 @@ describe("runAddTool", () => {
     await mkdir(join(subDir, ".agsync"), { recursive: true });
 
     const file = await runAddTool(subDir, "db");
-    expect(file).toContain(join(subDir, ".agsync", "tools", "db.yaml"));
+    expect(file).toContain(join(subDir, ".agsync", "mcp", "db.yaml"));
   });
 
   it("throws when no .agsync/ or agsync.yaml is found", async () => {

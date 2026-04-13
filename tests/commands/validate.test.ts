@@ -19,7 +19,7 @@ function baseConfig(overrides: Record<string, unknown> = {}): Record<string, unk
     },
     skills: [{ path: ".agsync/skills/*" }],
     commands: [{ path: ".agsync/commands/*.md" }],
-    tools: [{ path: ".agsync/tools/*.yaml" }],
+    mcp: [{ path: ".agsync/mcp/*.yaml" }],
     ...overrides,
   };
 }
@@ -43,13 +43,13 @@ describe("runValidate", () => {
   it("passes with valid config and matching references", async () => {
     const skillDir = join(tempDir, ".agsync", "skills", "test");
     await mkdir(skillDir, { recursive: true });
-    await mkdir(join(tempDir, ".agsync", "tools"), { recursive: true });
+    await mkdir(join(tempDir, ".agsync", "mcp"), { recursive: true });
     await mkdir(join(tempDir, ".agsync", "commands"), { recursive: true });
 
     await writeFile(join(tempDir, "agsync.yaml"), toYaml(baseConfig()));
 
     await writeFile(
-      join(tempDir, ".agsync", "tools", "grep.yaml"),
+      join(tempDir, ".agsync", "mcp", "grep.yaml"),
       toYaml({ name: "grep", description: "Search", type: "cli", command: "grep" })
     );
 
@@ -90,7 +90,7 @@ describe("runValidate", () => {
 
   it("warns when env var references are not set", async () => {
     delete process.env.AGSYNC_MISSING_TOKEN;
-    await mkdir(join(tempDir, ".agsync", "tools"), { recursive: true });
+    await mkdir(join(tempDir, ".agsync", "mcp"), { recursive: true });
 
     await writeFile(
       join(tempDir, "agsync.yaml"),
@@ -98,7 +98,7 @@ describe("runValidate", () => {
     );
 
     await writeFile(
-      join(tempDir, ".agsync", "tools", "api.yaml"),
+      join(tempDir, ".agsync", "mcp", "api.yaml"),
       toYaml({
         name: "api",
         description: "API server",
@@ -118,7 +118,7 @@ describe("runValidate", () => {
     const saved = process.env.AGSYNC_SET_TOKEN;
     process.env.AGSYNC_SET_TOKEN = "value";
     try {
-      await mkdir(join(tempDir, ".agsync", "tools"), { recursive: true });
+      await mkdir(join(tempDir, ".agsync", "mcp"), { recursive: true });
 
       await writeFile(
         join(tempDir, "agsync.yaml"),
@@ -126,7 +126,7 @@ describe("runValidate", () => {
       );
 
       await writeFile(
-        join(tempDir, ".agsync", "tools", "api.yaml"),
+        join(tempDir, ".agsync", "mcp", "api.yaml"),
         toYaml({
           name: "api",
           description: "API server",

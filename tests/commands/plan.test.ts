@@ -43,7 +43,7 @@ afterEach(async () => {
 async function setupProject(dir: string) {
   const skillDir = join(dir, ".agsync", "skills", "helper");
   await mkdir(skillDir, { recursive: true });
-  await mkdir(join(dir, ".agsync", "tools"), { recursive: true });
+  await mkdir(join(dir, ".agsync", "mcp"), { recursive: true });
 
   await writeFile(
     join(dir, "agsync.yaml"),
@@ -53,7 +53,7 @@ async function setupProject(dir: string) {
       agents: agentsThreeWay(),
       skills: [{ path: ".agsync/skills/*" }],
       commands: [],
-      tools: [{ path: ".agsync/tools/*.yaml" }],
+      mcp: [{ path: ".agsync/mcp/*.yaml" }],
     })
   );
 
@@ -66,7 +66,7 @@ async function setupProject(dir: string) {
   );
 
   await writeFile(
-    join(dir, ".agsync", "tools", "server.yaml"),
+    join(dir, ".agsync", "mcp", "server.yaml"),
     toYaml({
       name: "my-mcp",
       description: "MCP Server",
@@ -163,7 +163,7 @@ describe("buildSyncPlan", () => {
         },
         skills: [{ path: ".agsync/skills/*" }],
         commands: [],
-        tools: [{ path: ".agsync/tools/*.yaml" }],
+        mcp: [{ path: ".agsync/mcp/*.yaml" }],
       })
     );
 
@@ -194,7 +194,7 @@ describe("buildSyncPlan", () => {
         },
         skills: [{ path: ".agsync/skills/*" }],
         commands: [],
-        tools: [{ path: ".agsync/tools/*.yaml" }],
+        mcp: [{ path: ".agsync/mcp/*.yaml" }],
       })
     );
 
@@ -207,7 +207,7 @@ describe("buildSyncPlan", () => {
     delete process.env.AGSYNC_PLAN_TEST_VAR;
     await setupProject(tempDir);
     await writeFile(
-      join(tempDir, ".agsync", "tools", "env-tool.yaml"),
+      join(tempDir, ".agsync", "mcp", "env-tool.yaml"),
       toYaml({
         name: "env-tool",
         description: "Tool with env var",
@@ -233,7 +233,7 @@ describe("buildSyncPlan", () => {
         agents: { codex: { skills: { enabled: true } } },
         skills: [{ path: ".agsync/skills/*" }],
         commands: [],
-        tools: [],
+        mcp: [],
       })
     );
 

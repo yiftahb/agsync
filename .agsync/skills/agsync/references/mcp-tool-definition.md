@@ -1,11 +1,11 @@
 # MCP Tool Definitions
 
-Define MCP servers in `.agsync/tools/*.yaml`. During `agsync sync`, these are generated into each agent's MCP config file.
+Define MCP servers in `.agsync/mcp/*.yaml`. During `agsync sync`, these are generated into each agent's MCP config file.
 
 ## Example: GitHub MCP Server
 
 ```yaml
-# .agsync/tools/github.yaml
+# .agsync/mcp/github.yaml
 name: github
 description: GitHub MCP server for interacting with GitHub APIs
 type: mcp

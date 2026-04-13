@@ -22,7 +22,7 @@ function agsyncYaml(extra: Record<string, unknown> = {}): string {
     },
     skills: [],
     commands: [],
-    tools: [],
+    mcp: [],
     ...extra,
   });
 }
@@ -57,7 +57,7 @@ describe("loadConfigFile", () => {
         },
         skills: [{ path: "skills/*" }],
         commands: [{ path: "commands/*.md" }],
-        tools: [{ path: "tools/*.yaml" }],
+        mcp: [{ path: "mcp/*.yaml" }],
       })
     );
 
@@ -66,6 +66,7 @@ describe("loadConfigFile", () => {
     expect(result.agents.claude?.instructions?.enabled).toBe(true);
     expect(result.agents.cursor?.skills?.enabled).toBe(true);
     expect(result.skills).toEqual([{ path: "skills/*" }]);
+    expect(result.mcp).toEqual([{ path: "mcp/*.yaml" }]);
   });
 
   it("throws on invalid config", async () => {
@@ -96,15 +97,15 @@ describe("loadFullConfig", () => {
       )
     );
 
-    await mkdir(join(tempDir, "tools"), { recursive: true });
+    await mkdir(join(tempDir, "mcp"), { recursive: true });
     const tool = { name: "test-tool", description: "A test tool", type: "cli", command: "echo" };
-    await writeFile(join(tempDir, "tools", "test.yaml"), toYaml(tool));
+    await writeFile(join(tempDir, "mcp", "test.yaml"), toYaml(tool));
 
     await writeFile(
       join(tempDir, "agsync.yaml"),
       agsyncYaml({
         skills: [{ path: "skills/*" }],
-        tools: [{ path: "tools/*.yaml" }],
+        mcp: [{ path: "mcp/*.yaml" }],
       })
     );
 
@@ -114,8 +115,8 @@ describe("loadFullConfig", () => {
     expect(result.skills[0].name).toBe("my-skill");
     expect(result.skills[0].description).toBe("A test skill");
     expect(result.skills[0].instructions).toBe("Do testing");
-    expect(result.tools).toHaveLength(1);
-    expect(result.tools[0].name).toBe("test-tool");
+    expect(result.mcp).toHaveLength(1);
+    expect(result.mcp[0].name).toBe("test-tool");
   });
 
   it("loads commands from .md files (name from filename, raw content)", async () => {
@@ -142,14 +143,14 @@ describe("loadFullConfig", () => {
       agsyncYaml({
         skills: [{ path: "skills/*" }],
         commands: [{ path: "commands/*.md" }],
-        tools: [{ path: "tools/*.yaml" }],
+        mcp: [{ path: "mcp/*.yaml" }],
       })
     );
 
     const result = await loadFullConfig(join(tempDir, "agsync.yaml"));
     expect(result.skills).toHaveLength(0);
     expect(result.commands).toHaveLength(0);
-    expect(result.tools).toHaveLength(0);
+    expect(result.mcp).toHaveLength(0);
   });
 
   it("loads skill source and optional frontmatter fields from SKILL.md", async () => {

@@ -19,7 +19,7 @@ function validateSkillCompleteness(loaded: LoadedConfig): ValidationError[] {
 
 function validateCrossReferences(loaded: LoadedConfig): ValidationError[] {
   const errors: ValidationError[] = [];
-  const toolNames = new Set(loaded.tools.map((t) => t.name));
+  const toolNames = new Set(loaded.mcp.map((t) => t.name));
 
   for (const skill of loaded.skills) {
     for (const toolRef of skill.tools ?? []) {
@@ -49,7 +49,7 @@ function validateUniqueNames(loaded: LoadedConfig): ValidationError[] {
   };
 
   checkDuplicates(loaded.skills, "skill");
-  checkDuplicates(loaded.tools, "tool");
+  checkDuplicates(loaded.mcp, "mcp");
   checkDuplicates(loaded.commands, "command");
 
   return errors;
@@ -72,13 +72,13 @@ function validateCommands(loaded: LoadedConfig): ValidationError[] {
 }
 
 function validateEnvReferences(loaded: LoadedConfig): ValidationError[] {
-  const refs = findEnvReferences(loaded.tools);
+  const refs = findEnvReferences(loaded.mcp);
   const warnings: ValidationError[] = [];
 
   for (const ref of refs) {
     if (process.env[ref.varName] === undefined) {
       warnings.push({
-        file: `tool: ${ref.tool}`,
+        file: `mcp: ${ref.server}`,
         message: `Env var "${ref.varName}" is not set (key "${ref.key}")`,
         severity: "warn",
       });

@@ -42,7 +42,7 @@ describe("runDoctor", () => {
         agents: { codex: { skills: { enabled: true } } },
         skills: [],
         commands: [],
-        tools: [],
+        mcp: [],
       })
     );
 
@@ -74,7 +74,7 @@ describe("runDoctor", () => {
       agents: { claude: { skills: { enabled: true }, mcp: { enabled: true } } },
       skills: [],
       commands: [],
-      tools: [],
+      mcp: [],
     });
     jest.spyOn(registry, "resolveAgentConfig").mockReturnValue(resolved);
     jest.spyOn(registry, "getEnabledAgents").mockReturnValue(["claude"]);
@@ -101,7 +101,7 @@ describe("runDoctor", () => {
       agents: { codex: { skills: { enabled: false } } },
       skills: [],
       commands: [],
-      tools: [],
+      mcp: [],
     });
     jest.spyOn(registry, "resolveAgentConfig").mockReturnValue({
       codex: {

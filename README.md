@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  Git-native CLI to sync skills, commands, and MCP tools across AI coding agents.
+  Git-native CLI to sync skills, commands, and MCP servers across AI coding agents.
 </p>
 
 <p align="center">
@@ -79,7 +79,7 @@ One `agsync.yaml` at the repo root, multiple `.agsync/` directories in subfolder
 ```
 project/
 ├── agsync.yaml              ← single config
-├── .agsync/                 ← root skills, commands, tools
+├── .agsync/                 ← root skills, commands, mcp
 ├── frontend/
 │   └── .agsync/             ← frontend-specific definitions
 │       ├── instructions.md  → generates frontend/AGENTS.md

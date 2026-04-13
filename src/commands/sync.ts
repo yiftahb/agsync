@@ -8,11 +8,11 @@ import { loadHierarchicalConfig, findGitRoot } from "@/loader/hierarchy";
 import { resolveAllSkills } from "@/resolver/skills";
 import { resolveAgentConfig } from "@/agents/registry";
 import { runValidate } from "@/commands/validate";
-import { expandToolEnv, loadDotEnv } from "@/utils/env";
+import { expandMcpEnv, loadDotEnv } from "@/utils/env";
 import { readLockFile, writeLockFile } from "@/lock/lock";
 import type {
   ResolvedSkill, SyncPlan, PlannedFile, PlannedSkill,
-  ToolDefinition, AgentConfig, AgentMcpFeatureConfig, CommandDefinition,
+  McpDefinition, AgentConfig, AgentMcpFeatureConfig, CommandDefinition,
   GitignoreMode, ResolvedAgentConfig, LockFile, ScopedContent,
 } from "@/types";
 
@@ -32,7 +32,7 @@ function skillSourcePath(skill: ResolvedSkill): string {
   return `.agsync/skills/${baseName}/SKILL.md`;
 }
 
-function buildOutputSkillMd(skill: ResolvedSkill, tools: ToolDefinition[]): string {
+function buildOutputSkillMd(skill: ResolvedSkill, mcps: McpDefinition[]): string {
   const lines: string[] = [];
 
   lines.push("---");
@@ -51,9 +51,9 @@ function buildOutputSkillMd(skill: ResolvedSkill, tools: ToolDefinition[]): stri
     lines.push("## Available Tools");
     lines.push("");
     for (const toolName of skill.tools) {
-      const tool = tools.find((t) => t.name === toolName);
-      if (tool) {
-        lines.push(`- **${tool.name}**: ${tool.description}`);
+      const def = mcps.find((t) => t.name === toolName);
+      if (def) {
+        lines.push(`- **${def.name}**: ${def.description}`);
       } else {
         lines.push(`- ${toolName}`);
       }
@@ -168,14 +168,14 @@ function buildOutputCommand(cmd: CommandDefinition): string {
   return content + managedFooter(commandSourcePath(cmd));
 }
 
-function buildMcpServersObject(tools: ToolDefinition[]): Record<string, unknown> {
+function buildMcpServersObject(mcps: McpDefinition[]): Record<string, unknown> {
   const servers: Record<string, unknown> = {};
-  for (const tool of tools) {
-    if (tool.type !== "mcp") continue;
-    servers[tool.name] = {
-      command: tool.command ?? "",
-      args: tool.args ?? [],
-      env: tool.env ?? {},
+  for (const def of mcps) {
+    if (def.type !== "mcp") continue;
+    servers[def.name] = {
+      command: def.command ?? "",
+      args: def.args ?? [],
+      env: def.env ?? {},
     };
   }
   return servers;
@@ -258,13 +258,13 @@ export async function buildSyncPlan(
 
   loadDotEnv(baseDir);
 
-  let tools = loaded.tools;
+  let mcps = loaded.mcp;
   const warnings: string[] = [];
   if (options?.expandEnv !== false) {
-    const expanded = expandToolEnv(loaded.tools);
-    tools = expanded.tools;
+    const expanded = expandMcpEnv(loaded.mcp);
+    mcps = expanded.mcp;
     for (const w of expanded.warnings) {
-      warnings.push(`Environment variable "${w.varName}" is not set (tool "${w.tool}", key "${w.key}")`);
+      warnings.push(`Environment variable "${w.varName}" is not set (mcp "${w.server}", key "${w.key}")`);
     }
   }
 
@@ -302,7 +302,7 @@ export async function buildSyncPlan(
   for (const skill of resolvedSkills) {
     const dirName = skillDirName(skill.name);
     const skillMdPath = resolve(canonicalSkillsDir, dirName, "SKILL.md");
-    const content = buildOutputSkillMd(skill, tools);
+    const content = buildOutputSkillMd(skill, mcps);
     const existing = await readFileOrEmpty(skillMdPath);
     plannedFiles.push({
       path: skillMdPath,
@@ -356,7 +356,7 @@ export async function buildSyncPlan(
   }
 
   for (const [agentName, agentCfg] of Object.entries(agents)) {
-    planAgentFeatures(agentName, agentCfg, gitRoot, agentsMdPath, canonicalSkillsDir, canonicalCommandsDir, tools, plannedFiles);
+    planAgentFeatures(agentName, agentCfg, gitRoot, agentsMdPath, canonicalSkillsDir, canonicalCommandsDir, mcps, plannedFiles);
   }
 
   const symlinkErrors = await validateSymlinkTargets(plannedFiles);
@@ -383,7 +383,7 @@ function planAgentFeatures(
   agentsMdPath: string,
   canonicalSkillsDir: string,
   canonicalCommandsDir: string,
-  tools: ToolDefinition[],
+  mcps: McpDefinition[],
   files: PlannedFile[]
 ): void {
   if (config.instructions?.enabled) {
@@ -431,7 +431,7 @@ function planAgentFeatures(
   if (config.mcp?.enabled) {
     const mcpConfig = config.mcp as AgentMcpFeatureConfig;
     const dest = resolve(targetDir, mcpConfig.destination);
-    const mcpTools = tools.filter((t) => t.type === "mcp");
+    const mcpTools = mcps.filter((t) => t.type === "mcp");
     if (mcpTools.length > 0) {
       const servers = buildMcpServersObject(mcpTools);
       const { format, root_key } = mcpConfig.mcp_format;

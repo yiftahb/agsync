@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { ToolDefinition, EnvWarning, EnvReference } from "@/types";
+import type { McpDefinition, EnvWarning, EnvReference } from "@/types";
 
 const ENV_VAR_REGEX = /\$\{([^}]+)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g;
 
@@ -61,40 +61,64 @@ export function expandEnvValue(value: string): { result: string; missing: string
   return { result, missing };
 }
 
-export function expandToolEnv(tools: ToolDefinition[]): {
-  tools: ToolDefinition[];
+export function expandMcpEnv(mcps: McpDefinition[]): {
+  mcp: McpDefinition[];
   warnings: EnvWarning[];
 } {
   const warnings: EnvWarning[] = [];
 
-  const expanded = tools.map((tool) => {
-    if (!tool.env) return tool;
+  const expanded = mcps.map((def) => {
+    const updates: Partial<McpDefinition> = {};
 
-    const expandedEnv: Record<string, string> = {};
-    for (const [key, value] of Object.entries(tool.env)) {
-      const { result, missing } = expandEnvValue(value);
-      expandedEnv[key] = result;
-      for (const varName of missing) {
-        warnings.push({ tool: tool.name, key, varName });
+    if (def.env) {
+      const expandedEnv: Record<string, string> = {};
+      for (const [key, value] of Object.entries(def.env)) {
+        const { result, missing } = expandEnvValue(value);
+        expandedEnv[key] = result;
+        for (const varName of missing) {
+          warnings.push({ server: def.name, key, varName });
+        }
       }
+      updates.env = expandedEnv;
     }
 
-    return { ...tool, env: expandedEnv };
+    if (def.args) {
+      updates.args = def.args.map((arg) => {
+        const { result, missing } = expandEnvValue(arg);
+        for (const varName of missing) {
+          warnings.push({ server: def.name, key: "args", varName });
+        }
+        return result;
+      });
+    }
+
+    if (!updates.env && !updates.args) return def;
+    return { ...def, ...updates };
   });
 
-  return { tools: expanded, warnings };
+  return { mcp: expanded, warnings };
 }
 
-export function findEnvReferences(tools: ToolDefinition[]): EnvReference[] {
+export function findEnvReferences(mcps: McpDefinition[]): EnvReference[] {
   const refs: EnvReference[] = [];
 
-  for (const tool of tools) {
-    if (!tool.env) continue;
-    for (const [key, value] of Object.entries(tool.env)) {
-      let match: RegExpExecArray | null;
-      const regex = new RegExp(ENV_VAR_REGEX.source, "g");
-      while ((match = regex.exec(value)) !== null) {
-        refs.push({ tool: tool.name, key, varName: match[1] ?? match[2] });
+  for (const def of mcps) {
+    if (def.env) {
+      for (const [key, value] of Object.entries(def.env)) {
+        let match: RegExpExecArray | null;
+        const regex = new RegExp(ENV_VAR_REGEX.source, "g");
+        while ((match = regex.exec(value)) !== null) {
+          refs.push({ server: def.name, key, varName: match[1] ?? match[2] });
+        }
+      }
+    }
+    if (def.args) {
+      for (const arg of def.args) {
+        let match: RegExpExecArray | null;
+        const regex = new RegExp(ENV_VAR_REGEX.source, "g");
+        while ((match = regex.exec(arg)) !== null) {
+          refs.push({ server: def.name, key: "args", varName: match[1] ?? match[2] });
+        }
       }
     }
   }

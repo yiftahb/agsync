@@ -18,7 +18,7 @@ afterEach(async () => {
 async function setupConfig(dir: string) {
   await mkdir(join(dir, ".agsync", "skills"), { recursive: true });
   await mkdir(join(dir, ".agsync", "commands"), { recursive: true });
-  await mkdir(join(dir, ".agsync", "tools"), { recursive: true });
+  await mkdir(join(dir, ".agsync", "mcp"), { recursive: true });
   await writeFile(
     join(dir, "agsync.yaml"),
     toYaml({
@@ -27,7 +27,7 @@ async function setupConfig(dir: string) {
       agents: {},
       skills: [{ path: ".agsync/skills/*" }],
       commands: [{ path: ".agsync/commands/*" }],
-      tools: [{ path: ".agsync/tools/*.yaml" }],
+      mcp: [{ path: ".agsync/mcp/*.yaml" }],
     })
   );
 }
@@ -104,7 +104,7 @@ describe("runRemoveCommand", () => {
 describe("runRemoveTool", () => {
   it("removes an existing tool file", async () => {
     await setupConfig(tempDir);
-    const toolPath = join(tempDir, ".agsync", "tools", "github.yaml");
+    const toolPath = join(tempDir, ".agsync", "mcp", "github.yaml");
     await writeFile(toolPath, "name: github\ntype: mcp\n");
 
     await runRemoveTool(tempDir, "github");
@@ -118,7 +118,7 @@ describe("runRemoveTool", () => {
 
   it("finds nearest config from subdirectory", async () => {
     await setupConfig(tempDir);
-    const toolPath = join(tempDir, ".agsync", "tools", "test.yaml");
+    const toolPath = join(tempDir, ".agsync", "mcp", "test.yaml");
     await writeFile(toolPath, "name: test\ntype: mcp\n");
 
     const subDir = join(tempDir, "src");

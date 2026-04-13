@@ -36,7 +36,7 @@ export async function loadHierarchicalConfig(startDir: string): Promise<LoadedCo
     }));
     loaded.commands.push(...scopedCommands);
 
-    loaded.tools.push(...scope.tools);
+    loaded.mcp.push(...scope.mcp);
   }
 
   return loaded;

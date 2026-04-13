@@ -43,7 +43,7 @@ export async function runRemoveCommand(targetDir: string, commandName: string): 
 
 export async function runRemoveTool(targetDir: string, toolName: string): Promise<string> {
   const agsyncDir = await resolveAgsyncDir(targetDir);
-  const toolPath = resolve(agsyncDir, "tools", `${toolName}.yaml`);
+  const toolPath = resolve(agsyncDir, "mcp", `${toolName}.yaml`);
 
   try {
     await access(toolPath);

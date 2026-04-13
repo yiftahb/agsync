@@ -13,7 +13,7 @@ const SAMPLE_CONFIG = {
   gitignore: "mcpOnly",
   skills: [{ path: ".agsync/skills/*" }],
   commands: [{ path: ".agsync/commands/*" }],
-  tools: [{ path: ".agsync/tools/*.yaml" }],
+  mcp: [{ path: ".agsync/mcp/*.yaml" }],
   agents: {},
 };
 
@@ -44,7 +44,7 @@ export async function runInit(targetDir: string): Promise<string[]> {
     throw new Error("agsync.yaml already exists in this directory");
   }
 
-  const dirs = [".agsync/skills", ".agsync/commands", ".agsync/tools"];
+  const dirs = [".agsync/skills", ".agsync/commands", ".agsync/mcp"];
   for (const dir of dirs) {
     const dirPath = resolve(targetDir, dir);
     await mkdir(dirPath, { recursive: true });

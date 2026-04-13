@@ -23,7 +23,7 @@ MANAGING COMMANDS
 
 MANAGING TOOLS
   agsync tool add <name>                        Create a new empty tool definition (.yaml)
-  agsync tool remove <name>                     Remove a tool from .agsync/tools/
+  agsync tool remove <name>                     Remove a tool from .agsync/mcp/
 
 MAINTENANCE
   agsync doctor                           Check environment health and enabled agents
@@ -35,7 +35,7 @@ COMMON WORKFLOWS
 
   Set up a new project:
     agsync init
-    # Edit .agsync/skills/, .agsync/commands/, .agsync/tools/
+    # Edit .agsync/skills/, .agsync/commands/, .agsync/mcp/
     agsync sync
 
   Import a skill from GitHub:
@@ -50,7 +50,7 @@ COMMON WORKFLOWS
 
   Add an MCP tool:
     agsync tool add github
-    # Edit .agsync/tools/github.yaml with server config
+    # Edit .agsync/mcp/github.yaml with server config
     agsync sync
 
 SKILL FORMAT
@@ -120,7 +120,7 @@ COMMAND FORMAT
   Each file contains the command instructions in markdown.
 
 TOOL FORMAT
-  Define MCP servers in .agsync/tools/*.yaml:
+  Define MCP servers in .agsync/mcp/*.yaml:
 
     name: github
     description: GitHub MCP server
@@ -144,8 +144,8 @@ CONFIG FORMAT
       - path: .agsync/skills/*
     commands:
       - path: .agsync/commands/*
-    tools:
-      - path: .agsync/tools/*.yaml
+    mcp:
+      - path: .agsync/mcp/*.yaml
     agents:
       claude:
         instructions: { enabled: true }
@@ -176,7 +176,7 @@ GITIGNORE MANAGEMENT
 
 MONOREPO SCOPING
   One agsync.yaml lives at the repo root. Subfolders can each have their
-  own .agsync/ directory with skills, commands, tools, and instructions.
+  own .agsync/ directory with skills, commands, MCP definitions, and instructions.
   All output builds to the git root.
 
   Example:

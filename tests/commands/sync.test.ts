@@ -52,7 +52,7 @@ async function setupProject(
 ) {
   const skillDir = join(dir, ".agsync", "skills", "test-skill");
   await mkdir(skillDir, { recursive: true });
-  await mkdir(join(dir, ".agsync", "tools"), { recursive: true });
+  await mkdir(join(dir, ".agsync", "mcp"), { recursive: true });
 
   await writeFile(
     join(dir, "agsync.yaml"),
@@ -61,7 +61,7 @@ async function setupProject(
       features: { instructions: true, skills: true, commands: true, mcp: true },
       agents: agents ?? defaultAgents(),
       skills: [{ path: ".agsync/skills/*" }],
-      tools: [{ path: ".agsync/tools/*.yaml" }],
+      mcp: [{ path: ".agsync/mcp/*.yaml" }],
       ...extra,
     })
   );
@@ -83,7 +83,7 @@ Help the user with coding tasks
   );
 
   await writeFile(
-    join(dir, ".agsync", "tools", "server.yaml"),
+    join(dir, ".agsync", "mcp", "server.yaml"),
     toYaml({
       name: "my-mcp",
       description: "MCP Server",
@@ -263,7 +263,7 @@ describe("runSync", () => {
     try {
       await setupProject(tempDir);
       await writeFile(
-        join(tempDir, ".agsync", "tools", "env-tool.yaml"),
+        join(tempDir, ".agsync", "mcp", "env-tool.yaml"),
         toYaml({
           name: "env-tool",
           description: "Tool with env var",
@@ -295,7 +295,7 @@ describe("runSync", () => {
     delete process.env.AGSYNC_UNSET_VAR;
     await setupProject(tempDir);
     await writeFile(
-      join(tempDir, ".agsync", "tools", "bad-env.yaml"),
+      join(tempDir, ".agsync", "mcp", "bad-env.yaml"),
       toYaml({
         name: "bad-env",
         description: "Missing env",
@@ -326,7 +326,7 @@ describe("runSync", () => {
         features: { instructions: true, skills: true, commands: true, mcp: true },
         agents: { codex: { skills: { enabled: true } } },
         skills: [{ path: ".agsync/skills/*" }],
-        tools: [],
+        mcp: [],
       })
     );
 
@@ -386,7 +386,7 @@ Body
         agents: {},
         skills: [{ path: ".agsync/skills/*" }],
         commands: [],
-        tools: [],
+        mcp: [],
       })
     );
     await writeFile(
@@ -438,7 +438,7 @@ Body
         agents: {},
         skills: [],
         commands: [],
-        tools: [],
+        mcp: [],
       })
     );
     await writeFile(join(tempDir, ".agsync", "instructions.md"), "");
@@ -471,7 +471,7 @@ Body
         agents: {},
         skills: [{ path: "skills/*" }],
         commands: [],
-        tools: [],
+        mcp: [],
       })
     );
     await writeFile(join(tempDir, ".agsync", "instructions.md"), "Root instructions\n");
@@ -505,7 +505,7 @@ Body
         agents: {},
         skills: [],
         commands: [],
-        tools: [],
+        mcp: [],
       })
     );
     await writeFile(join(tempDir, ".agsync", "instructions.md"), "Root\n");

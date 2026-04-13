@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const toolDefinitionSchema = z.object({
+export const mcpDefinitionSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
   type: z.enum(["mcp", "cli", "builtin"]),
@@ -86,5 +86,5 @@ export const agsyncConfigSchema = z.object({
   agents: z.record(agentConfigSchema).default({}),
   skills: z.array(pathRefSchema).default([]),
   commands: z.array(pathRefSchema).default([]),
-  tools: z.array(pathRefSchema).default([]),
+  mcp: z.array(pathRefSchema).default([]),
 });

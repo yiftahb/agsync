@@ -37,7 +37,7 @@ describe("loadHierarchicalConfig", () => {
         agents: { codex: { instructions: { enabled: true } } },
         skills: [{ path: ".agsync/skills/*" }],
         commands: [],
-        tools: [],
+        mcp: [],
       })
     );
     await writeFile(
@@ -61,7 +61,7 @@ describe("loadHierarchicalConfig", () => {
         agents: {},
         skills: [{ path: ".agsync/skills/*" }],
         commands: [],
-        tools: [],
+        mcp: [],
       })
     );
     await writeFile(
@@ -98,7 +98,7 @@ describe("loadHierarchicalConfig", () => {
         agents: {},
         skills: [],
         commands: [],
-        tools: [],
+        mcp: [],
       })
     );
 
@@ -121,21 +121,21 @@ describe("loadHierarchicalConfig", () => {
         agents: {},
         skills: [],
         commands: [],
-        tools: [],
+        mcp: [],
       })
     );
 
     const childDir = join(tempDir, "services");
-    await mkdir(join(childDir, ".agsync", "tools"), { recursive: true });
+    await mkdir(join(childDir, ".agsync", "mcp"), { recursive: true });
     await writeFile(
-      join(childDir, ".agsync", "tools", "db.yaml"),
+      join(childDir, ".agsync", "mcp", "db.yaml"),
       toYaml({ name: "db", description: "Database tool", type: "mcp", command: "db-server" })
     );
 
     const result = await loadHierarchicalConfig(tempDir);
     expect(result).not.toBeNull();
-    expect(result!.tools).toHaveLength(1);
-    expect(result!.tools[0].name).toBe("db");
+    expect(result!.mcp).toHaveLength(1);
+    expect(result!.mcp[0].name).toBe("db");
   });
 
   it("populates scopes array with subfolder content", async () => {
@@ -146,7 +146,7 @@ describe("loadHierarchicalConfig", () => {
         agents: {},
         skills: [],
         commands: [],
-        tools: [],
+        mcp: [],
       })
     );
 
@@ -174,7 +174,7 @@ describe("loadHierarchicalConfig", () => {
         agents: {},
         skills: [],
         commands: [],
-        tools: [],
+        mcp: [],
       })
     );
 

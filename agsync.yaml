@@ -16,8 +16,8 @@ skills:
 commands:
   - path: .agsync/commands/*
 
-tools:
-  - path: .agsync/tools/*.yaml
+mcp:
+  - path: .agsync/mcp/*.yaml
 
 # ── Gitignore management ────────────────────────────────────
 # "on"      — add all generated output to .gitignore

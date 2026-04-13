@@ -35,7 +35,7 @@ project/
 │   │       └── SKILL.md                 # Stub with source (content fetched on sync)
 │   ├── commands/                        # Slash commands (.md files)
 │   │   └── deploy.md                    # /deploy command
-│   └── tools/*.yaml                     # MCP tool definitions
+│   └── mcp/*.yaml                       # MCP server definitions
 │
 ├── frontend/                            # Subfolder with its own .agsync/
 │   ├── .agsync/
@@ -144,7 +144,7 @@ skills:
 commands:
   - path: .agsync/commands/*
 tools:
-  - path: .agsync/tools/*.yaml
+  - path: .agsync/mcp/*.yaml
 agents:
   claude:
     instructions: { enabled: true }

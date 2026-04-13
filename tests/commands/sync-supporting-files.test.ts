@@ -206,7 +206,7 @@ async function setupSourceSkillProject(dir: string) {
         codex: { skills: { enabled: true } },
       },
       skills: [{ path: ".agsync/skills/*" }],
-      tools: [],
+      mcp: [],
     })
   );
 

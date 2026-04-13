@@ -21,7 +21,7 @@ describe("runInit", () => {
     expect(created).toContain("agsync.yaml");
     expect(created).toContain(".agsync/skills/");
     expect(created).toContain(".agsync/commands/");
-    expect(created).toContain(".agsync/tools/");
+    expect(created).toContain(".agsync/mcp/");
   });
 
   it("does not create a default skill", async () => {
@@ -65,7 +65,7 @@ describe("runInit", () => {
   it("creates required directories under .agsync", async () => {
     await runInit(tempDir);
 
-    for (const dir of ["skills", "commands", "tools"]) {
+    for (const dir of ["skills", "commands", "mcp"]) {
       await expect(access(join(tempDir, ".agsync", dir))).resolves.toBeUndefined();
     }
   });

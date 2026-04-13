@@ -5,7 +5,7 @@ import { glob } from "glob";
 import { parse as parseYaml } from "yaml";
 import {
   agsyncConfigSchema,
-  toolDefinitionSchema,
+  mcpDefinitionSchema,
 } from "@/schema/config";
 import { parseSkillMd } from "@/utils/github";
 import type {
@@ -14,7 +14,7 @@ import type {
   ScopedContent,
   SkillDefinition,
   CommandDefinition,
-  ToolDefinition,
+  McpDefinition,
 } from "@/types";
 
 export async function findConfigFile(startDir: string): Promise<string | null> {
@@ -144,15 +144,15 @@ export async function loadFullConfig(configPath: string): Promise<LoadedConfig> 
 
   const commands = await loadCommandEntries(baseDir, config.commands);
 
-  const tools = await loadYamlFiles<ToolDefinition>(
+  const mcp = await loadYamlFiles<McpDefinition>(
     baseDir,
-    config.tools,
-    (data) => toolDefinitionSchema.parse(data)
+    config.mcp,
+    (data) => mcpDefinitionSchema.parse(data)
   );
 
   const scopes = await discoverScopes(baseDir);
 
-  return { config, skills, commands, tools, configPath, scopes };
+  return { config, skills, commands, mcp, configPath, scopes };
 }
 
 export async function findNearestAgsyncDir(startDir: string): Promise<string | null> {
@@ -232,10 +232,10 @@ async function loadScopedContent(
     cmd.scope = relative;
   }
 
-  const toolsDir = resolve(agsyncDir, "tools");
-  const tools = existsSync(toolsDir)
-    ? await loadYamlFiles<ToolDefinition>(agsyncDir, [{ path: "tools/*.yaml" }], (data) =>
-        toolDefinitionSchema.parse(data)
+  const mcpDir = resolve(agsyncDir, "mcp");
+  const mcp = existsSync(mcpDir)
+    ? await loadYamlFiles<McpDefinition>(agsyncDir, [{ path: "mcp/*.yaml" }], (data) =>
+        mcpDefinitionSchema.parse(data)
       )
     : [];
 
@@ -245,7 +245,7 @@ async function loadScopedContent(
     instructions,
     skills,
     commands,
-    tools,
+    mcp,
   };
 }
 

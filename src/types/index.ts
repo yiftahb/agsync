@@ -50,7 +50,7 @@ export interface AgentDefinition {
   features: AgentConfig;
 }
 
-export interface ToolDefinition {
+export interface McpDefinition {
   name: string;
   description: string;
   type: "mcp" | "cli" | "builtin";
@@ -119,7 +119,7 @@ export interface AgsyncConfig {
   agents: Record<string, Partial<UserAgentConfig>>;
   skills: { path: string }[];
   commands: { path: string }[];
-  tools: { path: string }[];
+  mcp: { path: string }[];
 }
 
 export interface ResolvedAgentConfig {
@@ -132,14 +132,14 @@ export interface ScopedContent {
   instructions: string;
   skills: SkillDefinition[];
   commands: CommandDefinition[];
-  tools: ToolDefinition[];
+  mcp: McpDefinition[];
 }
 
 export interface LoadedConfig {
   config: AgsyncConfig;
   skills: SkillDefinition[];
   commands: CommandDefinition[];
-  tools: ToolDefinition[];
+  mcp: McpDefinition[];
   configPath: string;
   scopes: ScopedContent[];
 }
@@ -148,7 +148,7 @@ export interface ResolvedConfig {
   agents: ResolvedAgentConfig;
   skills: ResolvedSkill[];
   commands: CommandDefinition[];
-  tools: ToolDefinition[];
+  mcp: McpDefinition[];
 }
 
 export interface ConvertedFile {
@@ -249,13 +249,13 @@ export interface GitHubSearchResult {
 }
 
 export interface EnvWarning {
-  tool: string;
+  server: string;
   key: string;
   varName: string;
 }
 
 export interface EnvReference {
-  tool: string;
+  server: string;
   key: string;
   varName: string;
 }
