@@ -7,6 +7,7 @@ import {
   readdir,
   lstat,
 } from "node:fs/promises";
+import { parse as parseYaml } from "yaml";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { stringify as toYaml } from "yaml";
@@ -295,5 +296,27 @@ describe("sync supporting files", () => {
       (p) => p.includes("rules") && p.includes("code-reviewer")
     );
     expect(ruleRelated.length).toBeGreaterThanOrEqual(Object.keys(RULE_FILES).length);
+  });
+
+  it("preserves fetchedAt in lock file when content is unchanged", async () => {
+    globalThis.fetch = createMockFetch() as unknown as typeof fetch;
+    await setupSourceSkillProject(tempDir);
+
+    await runSync(tempDir);
+    const lockAfterFirst = parseYaml(
+      await readFile(join(tempDir, "agsync-lock.yaml"), "utf-8")
+    );
+    const firstFetchedAt = lockAfterFirst.sources["code-reviewer"].fetchedAt;
+    expect(firstFetchedAt).toBeDefined();
+
+    await new Promise((r) => setTimeout(r, 50));
+
+    await runSync(tempDir);
+    const lockAfterSecond = parseYaml(
+      await readFile(join(tempDir, "agsync-lock.yaml"), "utf-8")
+    );
+    const secondFetchedAt = lockAfterSecond.sources["code-reviewer"].fetchedAt;
+
+    expect(secondFetchedAt).toBe(firstFetchedAt);
   });
 });

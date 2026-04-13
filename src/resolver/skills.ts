@@ -89,13 +89,18 @@ async function fetchExternalSkill(
   const fetched = await registry.fetch(source);
   const parsed = parseSkillMd(fetched.skillMd);
 
-  ctx.lockUpdates.extends[rawRef] = {
-    registry: source.registry,
-    version: source.version,
-    resolved: fetched.resolvedVersion,
-    integrity: fetched.integrity,
-    fetchedAt: new Date().toISOString(),
-  };
+  const existingExtend = ctx.lock?.extends[rawRef];
+  if (existingExtend && existingExtend.resolved === fetched.resolvedVersion && existingExtend.integrity === fetched.integrity) {
+    ctx.lockUpdates.extends[rawRef] = existingExtend;
+  } else {
+    ctx.lockUpdates.extends[rawRef] = {
+      registry: source.registry,
+      version: source.version,
+      resolved: fetched.resolvedVersion,
+      integrity: fetched.integrity,
+      fetchedAt: new Date().toISOString(),
+    };
+  }
 
   return {
     name: parsed.name,
@@ -142,13 +147,18 @@ async function resolveSourceSkill(
 
   const fetched = await registry.fetch(skill.source);
 
-  ctx.lockUpdates.sources[skill.name] = {
-    registry: skill.source.registry,
-    version: skill.source.version,
-    resolved: fetched.resolvedVersion,
-    integrity: fetched.integrity,
-    fetchedAt: new Date().toISOString(),
-  };
+  const existingSource = ctx.lock?.sources[skill.name];
+  if (existingSource && existingSource.resolved === fetched.resolvedVersion && existingSource.integrity === fetched.integrity) {
+    ctx.lockUpdates.sources[skill.name] = existingSource;
+  } else {
+    ctx.lockUpdates.sources[skill.name] = {
+      registry: skill.source.registry,
+      version: skill.source.version,
+      resolved: fetched.resolvedVersion,
+      integrity: fetched.integrity,
+      fetchedAt: new Date().toISOString(),
+    };
+  }
 
   let remoteInstructions = "";
   let remoteDescription = skill.description;
