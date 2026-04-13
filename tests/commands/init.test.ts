@@ -24,17 +24,9 @@ describe("runInit", () => {
     expect(created).toContain(".agsync/tools/");
   });
 
-  it("creates default skill as SKILL.md (not YAML)", async () => {
+  it("does not create a default skill", async () => {
     const created = await runInit(tempDir);
-
-    expect(created).toContain(".agsync/skills/default/SKILL.md");
-
-    const skillContent = await readFile(
-      join(tempDir, ".agsync", "skills", "default", "SKILL.md"),
-      "utf-8"
-    );
-    expect(skillContent).toContain("name: default");
-    expect(skillContent).toContain("description:");
+    expect(created).not.toContain(".agsync/skills/default/SKILL.md");
   });
 
   it("creates .agsync/instructions.md", async () => {

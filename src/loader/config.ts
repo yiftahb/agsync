@@ -25,6 +25,17 @@ export async function findConfigFile(startDir: string): Promise<string | null> {
   }
 }
 
+export async function findNearestConfigFile(startDir: string): Promise<string | null> {
+  let current = resolve(startDir);
+  while (true) {
+    const found = await findConfigFile(current);
+    if (found) return found;
+    const parent = dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
 export async function loadConfigFile(configPath: string): Promise<AgsyncConfig> {
   const raw = await readFile(configPath, "utf-8");
   const parsed = parseYaml(raw);

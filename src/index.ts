@@ -5,8 +5,8 @@ import { runSync } from "@/commands/sync";
 import { runPlan, formatPlan } from "@/commands/plan";
 import { runDoctor } from "@/commands/doctor";
 import { getExtendedHelp } from "@/commands/help";
-import { runAdd } from "@/commands/add";
-import { runRemove } from "@/commands/remove";
+import { runAdd, runAddCommand, runAddTool } from "@/commands/add";
+import { runRemove, runRemoveCommand, runRemoveTool } from "@/commands/remove";
 import { runUpdate } from "@/commands/update";
 import { runVersion } from "@/commands/version";
 import { CURRENT_VERSION } from "@/utils/version";
@@ -125,13 +125,13 @@ const skill = program
   .description("Manage skills");
 
 skill
-  .command("add <source> [skill-name]")
-  .description("Add a skill from GitHub or ClawHub")
+  .command("add <name-or-source> [skill-name]")
+  .description("Add a local skill or import from github:/clawhub:")
   .option("-d, --dir <path>", "Target directory", process.cwd())
   .action(async (source: string, skillName: string | undefined, opts: { dir: string }) => {
     try {
       const files = await runAdd(opts.dir, source, skillName ?? "");
-      console.log(`Added skill from ${source}:`);
+      console.log(`Added skill:`);
       for (const file of files) {
         console.log(`  + ${file}`);
       }
@@ -149,6 +149,70 @@ skill
     try {
       const removed = await runRemove(opts.dir, skillName);
       console.log(`Removed skill "${skillName}" from ${removed}`);
+    } catch (err: unknown) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  });
+
+const command = program
+  .command("command")
+  .description("Manage commands");
+
+command
+  .command("add <name>")
+  .description("Create a new empty command")
+  .option("-d, --dir <path>", "Target directory", process.cwd())
+  .action(async (name: string, opts: { dir: string }) => {
+    try {
+      const file = await runAddCommand(opts.dir, name);
+      console.log(`Added command:\n  + ${file}`);
+    } catch (err: unknown) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  });
+
+command
+  .command("remove <name>")
+  .description("Remove a command")
+  .option("-d, --dir <path>", "Target directory", process.cwd())
+  .action(async (name: string, opts: { dir: string }) => {
+    try {
+      const removed = await runRemoveCommand(opts.dir, name);
+      console.log(`Removed command "${name}" from ${removed}`);
+    } catch (err: unknown) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  });
+
+const tool = program
+  .command("tool")
+  .description("Manage tools");
+
+tool
+  .command("add <name>")
+  .description("Create a new empty tool definition")
+  .option("-d, --dir <path>", "Target directory", process.cwd())
+  .action(async (name: string, opts: { dir: string }) => {
+    try {
+      const file = await runAddTool(opts.dir, name);
+      console.log(`Added tool:\n  + ${file}`);
+    } catch (err: unknown) {
+      console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      process.exit(1);
+    }
+  });
+
+tool
+  .command("remove <name>")
+  .description("Remove a tool")
+  .option("-d, --dir <path>", "Target directory", process.cwd())
+  .action(async (name: string, opts: { dir: string }) => {
+    try {
+      const removed = await runRemoveTool(opts.dir, name);
+      console.log(`Removed tool "${name}" from ${removed}`);
     } catch (err: unknown) {
       console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);

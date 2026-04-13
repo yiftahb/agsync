@@ -17,14 +17,6 @@ const SAMPLE_CONFIG = {
   agents: {},
 };
 
-const DEFAULT_SKILL_MD = `---
-name: default
-description: Default skill for this project
----
-
-You are a helpful coding assistant for this project.
-`;
-
 const INSTRUCTIONS_MD = `## Overview
 
 This project uses agsync to manage AI agent configurations.
@@ -65,12 +57,6 @@ export async function runInit(targetDir: string): Promise<string[]> {
   const instructionsPath = resolve(targetDir, ".agsync", "instructions.md");
   await writeFile(instructionsPath, INSTRUCTIONS_MD, "utf-8");
   created.push(".agsync/instructions.md");
-
-  const skillDir = resolve(targetDir, ".agsync", "skills", "default");
-  await mkdir(skillDir, { recursive: true });
-  const skillPath = resolve(skillDir, "SKILL.md");
-  await writeFile(skillPath, DEFAULT_SKILL_MD, "utf-8");
-  created.push(".agsync/skills/default/SKILL.md");
 
   return created;
 }

@@ -48,11 +48,10 @@ export class GitHubRegistry implements SkillRegistry {
 
     const entries = await fetchGitHubDirectory(org, repo, path);
     const skillMdEntry = entries.find((e) => e.name === "SKILL.md");
-
-    let skillMd = "";
-    if (skillMdEntry?.download_url) {
-      skillMd = await fetchFileContent(skillMdEntry.download_url);
+    if (!skillMdEntry?.download_url) {
+      throw new Error(`SKILL.md not found at ${org}/${repo}/${path}`);
     }
+    const skillMd = await fetchFileContent(skillMdEntry.download_url);
 
     const supportingFiles: { path: string; content: string }[] = [];
     const collectFiles = async (dirEntries: Awaited<ReturnType<typeof fetchGitHubDirectory>>, prefix: string) => {

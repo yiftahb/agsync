@@ -1,12 +1,13 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { stringify as toYaml } from "yaml";
-import { findConfigFile } from "@/loader/config";
+import { findNearestConfigFile } from "@/loader/config";
 import { getRegistry } from "@/registries/index";
 import { parseSkillMd } from "@/utils/github";
 import { writeLockFile, readLockFile } from "@/lock/lock";
 import type { SkillSource } from "@/types";
 
+const GITHUB_PREFIX = "github:";
 const CLAWHUB_PREFIX = "clawhub:";
 
 function buildSkillMd(frontmatter: Record<string, unknown>, body?: string): string {
@@ -27,53 +28,67 @@ interface PartialSource {
   version?: string;
 }
 
-function parseRef(repoRef: string, skillName: string): {
-  source: PartialSource;
+interface ParsedRef {
+  source: PartialSource | null;
   name: string;
-} {
-  if (repoRef.startsWith(CLAWHUB_PREFIX)) {
-    const rest = repoRef.slice(CLAWHUB_PREFIX.length);
+}
+
+function parseSource(ref: string, nameOverride: string): ParsedRef {
+  if (ref.startsWith(GITHUB_PREFIX)) {
+    const rest = ref.slice(GITHUB_PREFIX.length);
+    const atIdx = rest.lastIndexOf("@");
+    const pathPart = atIdx === -1 ? rest : rest.slice(0, atIdx);
+    const version = atIdx === -1 ? undefined : rest.slice(atIdx + 1);
+    const parts = pathPart.split("/");
+    if (parts.length < 3) {
+      throw new Error(`Invalid GitHub reference "${ref}". Expected format: github:org/repo/path[@version]`);
+    }
+    const org = parts[0];
+    const repo = parts[1];
+    const path = parts.slice(2).join("/") || "";
+    const name = nameOverride || parts[parts.length - 1] || repo;
+    return {
+      source: { registry: "github", org, repo, path, version },
+      name,
+    };
+  }
+
+  if (ref.startsWith(CLAWHUB_PREFIX)) {
+    const rest = ref.slice(CLAWHUB_PREFIX.length);
     const atIdx = rest.lastIndexOf("@");
     const slug = atIdx === -1 ? rest : rest.slice(0, atIdx);
     const version = atIdx === -1 ? undefined : rest.slice(atIdx + 1);
-    const name = skillName || slug.split("/").pop() || slug;
+    const name = nameOverride || slug.split("/").pop() || slug;
     return {
       source: { registry: "clawhub", slug, version },
       name,
     };
   }
 
-  const atIdx = skillName.lastIndexOf("@");
-  let resolvedName = skillName;
-  let version: string | undefined;
-  if (atIdx !== -1) {
-    resolvedName = skillName.slice(0, atIdx);
-    version = skillName.slice(atIdx + 1);
-  }
-
-  const parts = repoRef.split("/");
-  if (parts.length !== 2) {
-    throw new Error(`Invalid repo reference "${repoRef}". Expected format: org/repo`);
-  }
-  const [org, repo] = parts;
-
-  return {
-    source: { registry: "github", org, repo, path: resolvedName, version },
-    name: resolvedName,
-  };
+  return { source: null, name: nameOverride || ref };
 }
 
 export async function runAdd(
   targetDir: string,
-  repoRef: string,
+  ref: string,
   skillName: string
 ): Promise<string[]> {
-  const configPath = await findConfigFile(targetDir);
+  const configPath = await findNearestConfigFile(targetDir);
   if (!configPath) {
     throw new Error("No agsync.yaml found. Run 'agsync init' first");
   }
 
-  const { source: partialSource, name } = parseRef(repoRef, skillName);
+  const baseDir = dirname(configPath);
+  const { source: partialSource, name } = parseSource(ref, skillName);
+
+  if (!partialSource) {
+    const localSkillDir = resolve(baseDir, ".agsync", "skills", name);
+    await mkdir(localSkillDir, { recursive: true });
+    const skillMdPath = resolve(localSkillDir, "SKILL.md");
+    await writeFile(skillMdPath, buildSkillMd({ name, description: "" }), "utf-8");
+    return [skillMdPath];
+  }
+
   const registry = getRegistry(partialSource.registry);
 
   let version = partialSource.version;
@@ -91,7 +106,7 @@ export async function runAdd(
     source = { registry: "github", org: partialSource.org!, repo: partialSource.repo!, path: partialSource.path!, version };
   }
 
-  const localSkillDir = resolve(targetDir, ".agsync", "skills", name);
+  const localSkillDir = resolve(baseDir, ".agsync", "skills", name);
   await mkdir(localSkillDir, { recursive: true });
 
   const fetched = await registry.fetch(source);
@@ -120,7 +135,6 @@ export async function runAdd(
     await writeFile(filePath, file.content, "utf-8");
   }
 
-  const baseDir = dirname(configPath);
   const existingLock = await readLockFile(baseDir);
   const newLock = {
     lockVersion: 1 as const,
@@ -139,4 +153,42 @@ export async function runAdd(
   await writeLockFile(baseDir, newLock);
 
   return [skillMdPath];
+}
+
+export async function runAddCommand(
+  targetDir: string,
+  commandName: string
+): Promise<string> {
+  const configPath = await findNearestConfigFile(targetDir);
+  if (!configPath) {
+    throw new Error("No agsync.yaml found. Run 'agsync init' first");
+  }
+
+  const baseDir = dirname(configPath);
+  const cmdDir = resolve(baseDir, ".agsync", "commands");
+  await mkdir(cmdDir, { recursive: true });
+  const cmdPath = resolve(cmdDir, `${commandName}.md`);
+  await writeFile(cmdPath, `# ${commandName}\n\nDescribe what this command does.\n`, "utf-8");
+  return cmdPath;
+}
+
+export async function runAddTool(
+  targetDir: string,
+  toolName: string
+): Promise<string> {
+  const configPath = await findNearestConfigFile(targetDir);
+  if (!configPath) {
+    throw new Error("No agsync.yaml found. Run 'agsync init' first");
+  }
+
+  const baseDir = dirname(configPath);
+  const toolsDir = resolve(baseDir, ".agsync", "tools");
+  await mkdir(toolsDir, { recursive: true });
+  const toolPath = resolve(toolsDir, `${toolName}.yaml`);
+  await writeFile(
+    toolPath,
+    toYaml({ name: toolName, description: "", type: "mcp", command: "", args: [] }),
+    "utf-8"
+  );
+  return toolPath;
 }

@@ -122,4 +122,31 @@ describe("GitHubRegistry", () => {
     });
     expect(latest).toBe("0123456789ab");
   });
+
+  it("throws when SKILL.md is not found at the given path", async () => {
+    globalThis.fetch = jest.fn(async (url: string) => {
+      if (url.includes("/commits/v1.0.0")) {
+        return { ok: true, json: async () => ({ sha: "abc123def456" }) };
+      }
+      if (url.includes("/contents/")) {
+        return {
+          ok: true,
+          json: async () => [
+            { name: "README.md", path: "skill/README.md", type: "file", download_url: "https://example.com/README.md" },
+          ],
+        };
+      }
+      return { ok: false, status: 404 };
+    }) as unknown as typeof fetch;
+
+    const source: GitHubSource = {
+      registry: "github",
+      org: "acme",
+      repo: "skills",
+      path: "skill",
+      version: "v1.0.0",
+    };
+
+    await expect(registry.fetch(source)).rejects.toThrow(/SKILL\.md not found/);
+  });
 });

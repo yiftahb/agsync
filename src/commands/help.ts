@@ -12,11 +12,18 @@ GETTING STARTED
   agsync sync                             Generate output for all enabled agents
 
 MANAGING SKILLS
-  agsync skill add <org/repo> <name>      Import a skill from GitHub
-  agsync skill add <org/repo> <name@ver>  Import at a specific version
-  agsync skill add clawhub:<slug>         Import a skill from ClawHub
-  agsync skill add clawhub:<slug@ver>     Import at a specific ClawHub version
-  agsync skill remove <name>              Remove a skill from .agsync/skills/
+  agsync skill add <name>                       Create a local empty skill
+  agsync skill add github:<org/repo/path@ver>   Import a skill from GitHub
+  agsync skill add clawhub:<slug@ver>           Import a skill from ClawHub
+  agsync skill remove <name>                    Remove a skill from .agsync/skills/
+
+MANAGING COMMANDS
+  agsync command add <name>                     Create a new empty command (.md)
+  agsync command remove <name>                  Remove a command from .agsync/commands/
+
+MANAGING TOOLS
+  agsync tool add <name>                        Create a new empty tool definition (.yaml)
+  agsync tool remove <name>                     Remove a tool from .agsync/tools/
 
 MAINTENANCE
   agsync doctor                           Check environment health and enabled agents
@@ -32,7 +39,7 @@ COMMON WORKFLOWS
     agsync sync
 
   Import a skill from GitHub:
-    agsync skill add Shubhamsaboo/awesome-llm-apps code-reviewer
+    agsync skill add github:Shubhamsaboo/awesome-llm-apps/code-reviewer@v1.0.0
     # Creates a SKILL.md stub with a source reference
     agsync sync
 
