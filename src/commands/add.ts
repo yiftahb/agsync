@@ -135,12 +135,6 @@ export async function runAdd(
   const skillMdPath = resolve(localSkillDir, "SKILL.md");
   await writeFile(skillMdPath, buildSkillMd(frontmatter), "utf-8");
 
-  for (const file of fetched.supportingFiles) {
-    const filePath = resolve(localSkillDir, file.path);
-    await mkdir(dirname(filePath), { recursive: true });
-    await writeFile(filePath, file.content, "utf-8");
-  }
-
   const existingLock = await readLockFile(baseDir);
   const newLock = {
     lockVersion: 1 as const,

@@ -276,20 +276,14 @@ describe("sync supporting files", () => {
     expect(entries).not.toContain("code-reviewer.yaml");
   });
 
-  it("downloads supporting files under .agsync/skills during resolve", async () => {
+  it("does not write supporting files into .agsync/skills during resolve", async () => {
     globalThis.fetch = createMockFetch() as unknown as typeof fetch;
     await setupSourceSkillProject(tempDir);
     await runSync(tempDir);
 
-    const canonicalRules = join(
-      tempDir,
-      ".agsync",
-      "skills",
-      "code-reviewer",
-      "rules"
-    );
-    const files = await readdir(canonicalRules);
-    expect(files.sort()).toEqual(Object.keys(RULE_FILES).sort());
+    const sourceSkillDir = join(tempDir, ".agsync", "skills", "code-reviewer");
+    const entries = await readdir(sourceSkillDir);
+    expect(entries).toEqual(["SKILL.md"]);
   });
 
   it("records copied supporting paths in written output", async () => {

@@ -289,6 +289,7 @@ export async function buildSyncPlan(
       name: dirName,
       operation: existingSkillNames.has(dirName) ? "update" : "create",
       sourceDir: skill.sourceDir,
+      fetchedFiles: skill.fetchedFiles,
     });
   }
   for (const name of existingSkillNames) {
@@ -517,6 +518,18 @@ async function copySupportingFiles(plan: SyncPlan): Promise<string[]> {
   const activeSkills = plan.skills.filter((s) => s.operation !== "delete");
 
   for (const skill of activeSkills) {
+    const targetOutputDir = resolve(canonicalOutputDir, skill.name);
+
+    if (skill.fetchedFiles && skill.fetchedFiles.length > 0) {
+      for (const file of skill.fetchedFiles) {
+        const filePath = resolve(targetOutputDir, file.path);
+        await mkdir(dirname(filePath), { recursive: true });
+        await writeFile(filePath, file.content, "utf-8");
+        copied.push(filePath);
+      }
+      continue;
+    }
+
     const sourceDir = skill.sourceDir ?? resolve(plan.canonicalSkillsDir, skill.name);
     try {
       await fsStat(sourceDir);
@@ -526,7 +539,6 @@ async function copySupportingFiles(plan: SyncPlan): Promise<string[]> {
 
     const baseName = skill.name.includes("--") ? skill.name.split("--").pop()! : skill.name;
     const skipFiles = new Set(["SKILL.md", `${baseName}.yaml`]);
-    const targetOutputDir = resolve(canonicalOutputDir, skill.name);
     const files = await copyDirRecursive(sourceDir, targetOutputDir, skipFiles);
     copied.push(...files);
   }

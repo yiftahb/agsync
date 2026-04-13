@@ -1,5 +1,5 @@
-import { readFile, mkdir, writeFile } from "node:fs/promises";
-import { resolve, dirname } from "node:path";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { skillDefinitionSchema } from "@/schema/config";
 import { parseSkillMd } from "@/utils/github";
@@ -123,7 +123,7 @@ async function loadExtendedSkill(
 async function resolveSourceSkill(
   skill: SkillDefinition,
   ctx: ResolveContext
-): Promise<{ instructions: string; description: string }> {
+): Promise<{ instructions: string; description: string; fetchedFiles: { path: string; content: string }[] }> {
   if (!skill.source) {
     throw new Error(`Skill "${skill.name}" has no source to resolve`);
   }
@@ -159,15 +159,7 @@ async function resolveSourceSkill(
     remoteDescription = parsed.description || skill.description;
   }
 
-  const localDir = resolve(ctx.skillsDir, skill.name);
-  await mkdir(localDir, { recursive: true });
-  for (const file of fetched.supportingFiles) {
-    const filePath = resolve(localDir, file.path);
-    await mkdir(dirname(filePath), { recursive: true });
-    await writeFile(filePath, file.content, "utf-8");
-  }
-
-  return { instructions: remoteInstructions, description: remoteDescription };
+  return { instructions: remoteInstructions, description: remoteDescription, fetchedFiles: fetched.supportingFiles };
 }
 
 function mergeSkills(base: ResolvedSkill, overlay: SkillDefinition): ResolvedSkill {
@@ -199,6 +191,7 @@ async function resolveSkillChain(
 
   let effectiveInstructions = skill.instructions ?? "";
   let effectiveDescription = skill.description;
+  let fetchedFiles: { path: string; content: string }[] | undefined;
 
   if (skill.source) {
     const remote = await resolveSourceSkill(skill, ctx);
@@ -212,6 +205,9 @@ async function resolveSkillChain(
     if (!skill.description || skill.description === effectiveDescription) {
       effectiveDescription = remote.description;
     }
+    if (remote.fetchedFiles.length > 0) {
+      fetchedFiles = remote.fetchedFiles;
+    }
   }
 
   if (!skill.extends || skill.extends.length === 0) {
@@ -221,6 +217,7 @@ async function resolveSkillChain(
       instructions: effectiveInstructions,
       tools: skill.tools ?? [],
       extendsChain: [skill.name],
+      fetchedFiles,
     };
   }
 

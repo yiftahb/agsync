@@ -87,6 +87,11 @@ export interface SkillDefinition {
   sourceDir?: string;
 }
 
+export interface FetchedFile {
+  path: string;
+  content: string;
+}
+
 export interface ResolvedSkill {
   name: string;
   description: string;
@@ -95,6 +100,7 @@ export interface ResolvedSkill {
   extendsChain: string[];
   scope?: string;
   sourceDir?: string;
+  fetchedFiles?: FetchedFile[];
 }
 
 export interface CommandDefinition {
@@ -167,6 +173,7 @@ export interface PlannedSkill {
   name: string;
   operation: PlannedOperation;
   sourceDir?: string;
+  fetchedFiles?: FetchedFile[];
 }
 
 export interface PlannedFile {
