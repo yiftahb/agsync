@@ -94,8 +94,7 @@ export async function runAdd(
   const localSkillDir = resolve(targetDir, ".agsync", "skills", name);
   await mkdir(localSkillDir, { recursive: true });
 
-  const cacheDir = resolve(targetDir, ".agsync", "cache");
-  const fetched = await registry.fetch(source, cacheDir);
+  const fetched = await registry.fetch(source);
 
   let resolvedName = name;
   let description = "";

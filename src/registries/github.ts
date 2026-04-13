@@ -1,6 +1,3 @@
-import { mkdir, writeFile, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import type { SkillSource, GitHubSource, SkillRegistry, FetchedSkill } from "@/types";
 import {
@@ -35,30 +32,18 @@ function isSha(ref: string): boolean {
 export class GitHubRegistry implements SkillRegistry {
   name = "github";
 
-  async fetch(source: SkillSource, cacheDir: string): Promise<FetchedSkill> {
+  async fetch(source: SkillSource): Promise<FetchedSkill> {
     if (!isGitHubSource(source)) {
       throw new Error("GitHubRegistry.fetch called with non-GitHub source");
     }
 
     const { org, repo, path, version } = source;
-    const cachePath = resolve(cacheDir, org, repo, version, path);
 
     let resolvedVersion: string;
     if (isSha(version)) {
       resolvedVersion = version;
     } else {
       resolvedVersion = await resolveRefToSha(org, repo, version);
-    }
-
-    const cachedSkillMd = resolve(cachePath, "SKILL.md");
-    if (existsSync(cachedSkillMd)) {
-      const skillMd = await readFile(cachedSkillMd, "utf-8");
-      return {
-        skillMd,
-        supportingFiles: [],
-        resolvedVersion,
-        integrity: computeIntegrity(skillMd),
-      };
     }
 
     const entries = await fetchGitHubDirectory(org, repo, path);
@@ -84,11 +69,6 @@ export class GitHubRegistry implements SkillRegistry {
       }
     };
     await collectFiles(entries, "");
-
-    await mkdir(cachePath, { recursive: true });
-    if (skillMd) {
-      await writeFile(cachedSkillMd, skillMd, "utf-8");
-    }
 
     return {
       skillMd,

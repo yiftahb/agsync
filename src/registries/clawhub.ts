@@ -1,6 +1,3 @@
-import { mkdir, writeFile, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import type { SkillSource, ClawHubSource, SkillRegistry, FetchedSkill } from "@/types";
 
@@ -28,25 +25,12 @@ interface ClawHubFileEntry {
 export class ClawHubRegistry implements SkillRegistry {
   name = "clawhub";
 
-  async fetch(source: SkillSource, cacheDir: string): Promise<FetchedSkill> {
+  async fetch(source: SkillSource): Promise<FetchedSkill> {
     if (!isClawHubSource(source)) {
       throw new Error("ClawHubRegistry.fetch called with non-ClawHub source");
     }
 
     const { slug, version } = source;
-    const safeSlug = slug.replace(/\//g, "__");
-    const cachePath = resolve(cacheDir, "clawhub", safeSlug, version);
-    const cachedSkillMd = resolve(cachePath, "SKILL.md");
-
-    if (existsSync(cachedSkillMd)) {
-      const skillMd = await readFile(cachedSkillMd, "utf-8");
-      return {
-        skillMd,
-        supportingFiles: [],
-        resolvedVersion: version,
-        integrity: computeIntegrity(skillMd),
-      };
-    }
 
     const filesResponse = await fetch(
       `${CLAWHUB_API}/skills/${encodeURIComponent(slug)}?version=${encodeURIComponent(version)}`,
@@ -74,11 +58,6 @@ export class ClawHubRegistry implements SkillRegistry {
     if (!skillMd && fileList.length === 0) {
       const content = await this.fetchFile(slug, version, "SKILL.md");
       skillMd = content;
-    }
-
-    await mkdir(cachePath, { recursive: true });
-    if (skillMd) {
-      await writeFile(cachedSkillMd, skillMd, "utf-8");
     }
 
     return {

@@ -1,21 +1,15 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { ClawHubRegistry } from "@/registries/clawhub";
 import type { ClawHubSource } from "@/types";
 
 let originalFetch: typeof globalThis.fetch;
-let tempDir: string;
 const registry = new ClawHubRegistry();
 
-beforeEach(async () => {
-  tempDir = await mkdtemp(join(tmpdir(), "agsync-clawhub-"));
+beforeEach(() => {
   originalFetch = globalThis.fetch;
 });
 
-afterEach(async () => {
+afterEach(() => {
   globalThis.fetch = originalFetch;
-  await rm(tempDir, { recursive: true, force: true });
 });
 
 describe("ClawHubRegistry", () => {
@@ -55,8 +49,7 @@ describe("ClawHubRegistry", () => {
       version: "3.0.0",
     };
 
-    const cacheDir = join(tempDir, "cache");
-    const result = await registry.fetch(source, cacheDir);
+    const result = await registry.fetch(source);
     expect(result.resolvedVersion).toBe("3.0.0");
     expect(result.skillMd).toContain("name: my-skill");
     expect(result.supportingFiles).toHaveLength(1);

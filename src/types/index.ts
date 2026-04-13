@@ -212,7 +212,7 @@ export type PartialSkillSource = Record<string, unknown> & { registry: string; v
 
 export interface SkillRegistry {
   name: string;
-  fetch(source: SkillSource, cacheDir: string): Promise<FetchedSkill>;
+  fetch(source: SkillSource): Promise<FetchedSkill>;
   resolveLatest(source: PartialSkillSource): Promise<string>;
 }
 

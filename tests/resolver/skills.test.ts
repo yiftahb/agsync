@@ -7,15 +7,12 @@ import type { SkillDefinition } from "@/types";
 
 let tempDir: string;
 let skillsDir: string;
-let cacheDir: string;
 let originalFetch: typeof globalThis.fetch;
 
 beforeEach(async () => {
   tempDir = await mkdtemp(join(tmpdir(), "agsync-resolver-"));
   skillsDir = join(tempDir, "skills");
-  cacheDir = join(tempDir, ".agsync", "cache");
   await mkdir(skillsDir, { recursive: true });
-  await mkdir(cacheDir, { recursive: true });
   originalFetch = globalThis.fetch;
 });
 
@@ -33,7 +30,7 @@ describe("resolveAllSkills", () => {
       tools: ["grep"],
     };
 
-    const { skills: result } = await resolveAllSkills([skill], skillsDir, cacheDir);
+    const { skills: result } = await resolveAllSkills([skill], skillsDir);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("simple");
     expect(result[0].instructions).toBe("Do things");
@@ -58,7 +55,7 @@ describe("resolveAllSkills", () => {
       tools: ["write"],
     };
 
-    const { skills: result } = await resolveAllSkills([childSkill], skillsDir, cacheDir);
+    const { skills: result } = await resolveAllSkills([childSkill], skillsDir);
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("child");
     expect(result[0].instructions).toContain("Base instructions");
@@ -93,7 +90,7 @@ describe("resolveAllSkills", () => {
       tools: ["tool-c"],
     };
 
-    const { skills: result } = await resolveAllSkills([child], skillsDir, cacheDir);
+    const { skills: result } = await resolveAllSkills([child], skillsDir);
     expect(result[0].tools).toContain("tool-a");
     expect(result[0].tools).toContain("tool-b");
     expect(result[0].tools).toContain("tool-c");
@@ -126,7 +123,7 @@ describe("resolveAllSkills", () => {
       instructions: "A",
     };
 
-    await expect(resolveAllSkills([entrySkill], skillsDir, cacheDir)).rejects.toThrow(
+    await expect(resolveAllSkills([entrySkill], skillsDir)).rejects.toThrow(
       /[Cc]ircular/
     );
   });
@@ -148,7 +145,7 @@ describe("resolveAllSkills", () => {
       tools: ["grep", "write"],
     };
 
-    const { skills: result } = await resolveAllSkills([child], skillsDir, cacheDir);
+    const { skills: result } = await resolveAllSkills([child], skillsDir);
     const grepCount = result[0].tools.filter((t: string) => t === "grep").length;
     expect(grepCount).toBe(1);
     expect(result[0].tools).toContain("read");
@@ -197,7 +194,7 @@ Parent remote body
       tools: ["local-tool"],
     };
 
-    const { skills: result } = await resolveAllSkills([child], skillsDir, cacheDir);
+    const { skills: result } = await resolveAllSkills([child], skillsDir);
     expect(result[0].name).toBe("child");
     expect(result[0].instructions).toContain("Parent remote body");
     expect(result[0].instructions).toContain("Local overlay");
@@ -257,7 +254,7 @@ Body from **SKILL.md**
       },
     };
 
-    const { skills: result } = await resolveAllSkills([entry], skillsDir, cacheDir);
+    const { skills: result } = await resolveAllSkills([entry], skillsDir);
     expect(result[0].name).toBe("gh-skill");
     expect(result[0].description).toBe("Loaded from GitHub");
     expect(result[0].instructions).toContain("Body from **SKILL.md**");

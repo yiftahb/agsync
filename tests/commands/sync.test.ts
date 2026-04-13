@@ -493,4 +493,21 @@ Body
     await expect(stat(join(tempDir, ".claude", "settings.json"))).rejects.toThrow();
     await expect(stat(join(tempDir, ".cursor", "mcp.json"))).rejects.toThrow();
   });
+
+  it("fails when symlink target is a non-empty directory", async () => {
+    await setupProject(tempDir);
+    await mkdir(join(tempDir, ".claude", "skills"), { recursive: true });
+    await writeFile(join(tempDir, ".claude", "skills", "existing.md"), "real content");
+
+    await expect(runSync(tempDir)).rejects.toThrow(/non-empty directory/);
+  });
+
+  it("succeeds when symlink target is an empty directory", async () => {
+    await setupProject(tempDir);
+    await mkdir(join(tempDir, ".claude", "skills"), { recursive: true });
+
+    await runSync(tempDir);
+    const s = await lstat(join(tempDir, ".claude", "skills"));
+    expect(s.isSymbolicLink()).toBe(true);
+  });
 });

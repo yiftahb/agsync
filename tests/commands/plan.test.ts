@@ -342,4 +342,12 @@ describe("runPlan", () => {
     expect(plan.skills.length).toBeGreaterThan(0);
     expect(plan.skills.every((s) => s.operation)).toBe(true);
   });
+
+  it("fails when symlink target is a non-empty directory", async () => {
+    await setupProject(tempDir);
+    await mkdir(join(tempDir, ".claude", "skills"), { recursive: true });
+    await writeFile(join(tempDir, ".claude", "skills", "existing.md"), "real content");
+
+    await expect(runPlan(tempDir)).rejects.toThrow(/non-empty directory/);
+  });
 });

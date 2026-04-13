@@ -205,8 +205,7 @@ export async function buildSyncPlan(
   }
 
   const skillsDir = resolve(baseDir, ".agsync", "skills");
-  const cacheDir = resolve(baseDir, ".agsync", "cache");
-  const resolveResult = await resolveAllSkills(loaded.skills, skillsDir, cacheDir, { lock, frozen });
+  const resolveResult = await resolveAllSkills(loaded.skills, skillsDir, { lock, frozen });
   const resolvedSkills = resolveResult.skills;
 
   let tools = loaded.tools;
@@ -292,6 +291,13 @@ export async function buildSyncPlan(
     planAgentFeatures(agentName, agentCfg, gitRoot, agentsMdPath, canonicalSkillsDir, canonicalCommandsDir, tools, plannedFiles);
   }
 
+  const symlinkErrors = await validateSymlinkTargets(plannedFiles);
+  if (symlinkErrors.length > 0) {
+    throw new Error(
+      `Sync blocked — target paths are not empty:\n${symlinkErrors.map(e => `  ${e}`).join("\n")}`
+    );
+  }
+
   return {
     skills: plannedSkills,
     files: plannedFiles,
@@ -373,6 +379,32 @@ function planAgentFeatures(
       });
     }
   }
+}
+
+async function validateSymlinkTargets(files: PlannedFile[]): Promise<string[]> {
+  const errors: string[] = [];
+  for (const file of files) {
+    if (!file.symlink) continue;
+    try {
+      const s = await lstat(file.path);
+      if (s.isSymbolicLink()) continue;
+      if (s.isDirectory()) {
+        const entries = await readdir(file.path);
+        if (entries.length > 0) {
+          errors.push(
+            `"${file.path}" is a non-empty directory — remove its contents or delete it before syncing`
+          );
+        }
+      } else {
+        errors.push(
+          `"${file.path}" already exists as a regular file — remove it before syncing`
+        );
+      }
+    } catch {
+      // does not exist — OK
+    }
+  }
+  return errors;
 }
 
 async function copyDirRecursive(

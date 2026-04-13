@@ -45,7 +45,7 @@ describe("GitHubRegistry", () => {
       version: "v1.0.0",
     };
 
-    const result = await registry.fetch(source, "/tmp/cache");
+    const result = await registry.fetch(source);
     expect(result.resolvedVersion).toBe(sha);
     expect(result.skillMd).toContain("name: test");
     expect(result.integrity).toMatch(/^sha256:/);
@@ -76,7 +76,7 @@ describe("GitHubRegistry", () => {
       version: sha,
     };
 
-    const result = await registry.fetch(source, "/tmp/cache-sha");
+    const result = await registry.fetch(source);
     expect(result.resolvedVersion).toBe(sha);
   });
 

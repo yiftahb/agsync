@@ -55,7 +55,6 @@ function parseExternalRef(ref: string): { source: SkillSource; rawRef: string } 
 
 interface ResolveContext {
   skillsDir: string;
-  cacheDir: string;
   lock: LockFile | null;
   frozen: boolean;
   lockUpdates: { sources: Record<string, LockEntry>; extends: Record<string, LockEntry> };
@@ -87,7 +86,7 @@ async function fetchExternalSkill(
     }
   }
 
-  const fetched = await registry.fetch(source, ctx.cacheDir);
+  const fetched = await registry.fetch(source);
   const parsed = parseSkillMd(fetched.skillMd);
 
   ctx.lockUpdates.extends[rawRef] = {
@@ -141,7 +140,7 @@ async function resolveSourceSkill(
     }
   }
 
-  const fetched = await registry.fetch(skill.source, ctx.cacheDir);
+  const fetched = await registry.fetch(skill.source);
 
   ctx.lockUpdates.sources[skill.name] = {
     registry: skill.source.registry,
@@ -258,12 +257,10 @@ async function resolveSkillChain(
 export async function resolveAllSkills(
   skills: SkillDefinition[],
   skillsDir: string,
-  cacheDir: string,
   options?: ResolveOptions
 ): Promise<ResolveResult> {
   const ctx: ResolveContext = {
     skillsDir,
-    cacheDir,
     lock: options?.lock ?? null,
     frozen: options?.frozen ?? false,
     lockUpdates: { sources: {}, extends: {} },
