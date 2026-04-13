@@ -63,5 +63,5 @@ export async function runPlan(
   targetDir: string,
   options?: { frozen?: boolean }
 ): Promise<SyncPlan> {
-  return buildSyncPlan(targetDir, { expandEnv: false, frozen: options?.frozen });
+  return buildSyncPlan(targetDir, { frozen: options?.frozen });
 }
