@@ -2,17 +2,28 @@
 
 Define MCP servers in `.agsync/mcp/*.yaml`. During `agsync sync`, these are generated into each agent's MCP config file.
 
-## Example: GitHub MCP Server
+## Example: Stdio Server (default)
 
 ```yaml
 # .agsync/mcp/github.yaml
 name: github
 description: GitHub MCP server for interacting with GitHub APIs
-type: mcp
 command: npx
 args: ["-y", "@modelcontextprotocol/server-github"]
 env:
   GITHUB_PERSONAL_ACCESS_TOKEN: $GITHUB_PERSONAL_ACCESS_TOKEN
+```
+
+## Example: HTTP Server (remote)
+
+```yaml
+# .agsync/mcp/remote-api.yaml
+name: remote-api
+description: Remote MCP server
+type: http
+url: https://api.example.com/mcp
+headers:
+  Authorization: Bearer $API_TOKEN
 ```
 
 ## Tool Fields
@@ -21,10 +32,12 @@ env:
 |-------|----------|-------------|
 | name | Yes | Tool identifier |
 | description | Yes | What this tool does |
-| type | Yes | `mcp`, `cli`, or `builtin` |
-| command | For mcp/cli | Command to run |
-| args | No | Command arguments |
+| type | No | `stdio` (default) or `http` |
+| command | For stdio | Command to run |
+| args | No | Command arguments (stdio only) |
 | env | No | Environment variables (supports `$VAR` expansion) |
+| url | For http | Remote server URL |
+| headers | No | HTTP headers (http only, not supported by all agents) |
 
 ## Environment Variable Expansion
 

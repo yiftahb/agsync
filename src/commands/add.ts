@@ -177,7 +177,7 @@ export async function runAddTool(
   const toolPath = resolve(mcpDir, `${toolName}.yaml`);
   await writeFile(
     toolPath,
-    toYaml({ name: toolName, description: "", type: "mcp", command: "", args: [] }),
+    toYaml({ name: toolName, description: "", command: "", args: [] }),
     "utf-8"
   );
   return toolPath;

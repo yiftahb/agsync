@@ -233,38 +233,42 @@ describe("skillDefinitionSchema", () => {
 });
 
 describe("mcpDefinitionSchema", () => {
-  it("parses an MCP tool", () => {
+  it("parses a stdio tool", () => {
     const input = {
       name: "my-server",
       description: "MCP server",
-      type: "mcp",
+      type: "stdio",
       command: "node",
       args: ["server.js"],
       env: { API_KEY: "ref:secret" },
     };
     const result = mcpDefinitionSchema.parse(input);
-    expect(result.type).toBe("mcp");
+    expect(result.type).toBe("stdio");
     expect(result.args).toEqual(["server.js"]);
   });
 
-  it("parses a CLI tool", () => {
+  it("parses an http tool", () => {
     const input = {
-      name: "grep",
-      description: "Search tool",
-      type: "cli",
-      command: "grep",
+      name: "remote",
+      description: "Remote server",
+      type: "http",
+      url: "https://api.example.com/mcp",
+      headers: { Authorization: "Bearer token" },
     };
     const result = mcpDefinitionSchema.parse(input);
-    expect(result.type).toBe("cli");
+    expect(result.type).toBe("http");
+    expect(result.url).toBe("https://api.example.com/mcp");
+    expect(result.headers).toEqual({ Authorization: "Bearer token" });
   });
 
-  it("parses a builtin tool", () => {
+  it("defaults type to undefined when omitted", () => {
     const input = {
-      name: "fs",
-      description: "Built-in filesystem",
-      type: "builtin",
+      name: "my-server",
+      description: "MCP server",
+      command: "node",
     };
-    expect(mcpDefinitionSchema.parse(input).type).toBe("builtin");
+    const result = mcpDefinitionSchema.parse(input);
+    expect(result.type).toBeUndefined();
   });
 
   it("rejects unknown type", () => {

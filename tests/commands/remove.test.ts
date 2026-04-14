@@ -105,7 +105,7 @@ describe("runRemoveTool", () => {
   it("removes an existing tool file", async () => {
     await setupConfig(tempDir);
     const toolPath = join(tempDir, ".agsync", "mcp", "github.yaml");
-    await writeFile(toolPath, "name: github\ntype: mcp\n");
+    await writeFile(toolPath, "name: github\ndescription: test\n");
 
     await runRemoveTool(tempDir, "github");
     await expect(access(toolPath)).rejects.toThrow();
@@ -119,7 +119,7 @@ describe("runRemoveTool", () => {
   it("finds nearest config from subdirectory", async () => {
     await setupConfig(tempDir);
     const toolPath = join(tempDir, ".agsync", "mcp", "test.yaml");
-    await writeFile(toolPath, "name: test\ntype: mcp\n");
+    await writeFile(toolPath, "name: test\ndescription: test\n");
 
     const subDir = join(tempDir, "src");
     await mkdir(subDir, { recursive: true });

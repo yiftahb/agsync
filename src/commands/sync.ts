@@ -168,15 +168,42 @@ function buildOutputCommand(cmd: CommandDefinition): string {
   return content + managedFooter(commandSourcePath(cmd));
 }
 
-function buildMcpServersObject(mcps: McpDefinition[]): Record<string, unknown> {
+function buildMcpServerEntry(def: McpDefinition, agentName: string): Record<string, unknown> {
+  if (def.type === "http") {
+    const hasHeaders = def.headers && Object.keys(def.headers).length > 0;
+
+    if (agentName === "windsurf") {
+      const entry: Record<string, unknown> = { serverUrl: def.url ?? "" };
+      if (hasHeaders) entry.headers = def.headers;
+      return entry;
+    }
+    if (agentName === "copilot") {
+      const entry: Record<string, unknown> = { type: "http", url: def.url ?? "" };
+      if (hasHeaders) entry.headers = def.headers;
+      return entry;
+    }
+    if (agentName === "opencode") {
+      const entry: Record<string, unknown> = { type: "remote", url: def.url ?? "" };
+      if (hasHeaders) entry.headers = def.headers;
+      return entry;
+    }
+
+    const entry: Record<string, unknown> = { url: def.url ?? "" };
+    if (hasHeaders && agentName !== "codex") entry.headers = def.headers;
+    return entry;
+  }
+
+  return {
+    command: def.command ?? "",
+    args: def.args ?? [],
+    env: def.env ?? {},
+  };
+}
+
+function buildMcpServersObject(mcps: McpDefinition[], agentName: string): Record<string, unknown> {
   const servers: Record<string, unknown> = {};
   for (const def of mcps) {
-    if (def.type !== "mcp") continue;
-    servers[def.name] = {
-      command: def.command ?? "",
-      args: def.args ?? [],
-      env: def.env ?? {},
-    };
+    servers[def.name] = buildMcpServerEntry(def, agentName);
   }
   return servers;
 }
@@ -378,7 +405,7 @@ export async function buildSyncPlan(
 }
 
 function planAgentFeatures(
-  _agentName: string,
+  agentName: string,
   config: AgentConfig,
   targetDir: string,
   agentsMdPath: string,
@@ -432,9 +459,8 @@ function planAgentFeatures(
   if (config.mcp?.enabled) {
     const mcpConfig = config.mcp as AgentMcpFeatureConfig;
     const dest = resolve(targetDir, mcpConfig.destination);
-    const mcpTools = mcps.filter((t) => t.type === "mcp");
-    if (mcpTools.length > 0) {
-      const servers = buildMcpServersObject(mcpTools);
+    if (mcps.length > 0) {
+      const servers = buildMcpServersObject(mcps, agentName);
       const { format, root_key } = mcpConfig.mcp_format;
       const content = format === "toml"
         ? serializeMcpToml(root_key, servers)

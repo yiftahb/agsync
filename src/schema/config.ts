@@ -3,11 +3,12 @@ import { z } from "zod";
 export const mcpDefinitionSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
-  type: z.enum(["mcp", "cli", "builtin"]),
+  type: z.enum(["stdio", "http"]).optional(),
   command: z.string().optional(),
   url: z.string().optional(),
   args: z.array(z.string()).optional(),
   env: z.record(z.string()).optional(),
+  headers: z.record(z.string()).optional(),
 });
 
 export const githubSourceSchema = z.object({

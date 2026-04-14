@@ -53,11 +53,12 @@ export interface AgentDefinition {
 export interface McpDefinition {
   name: string;
   description: string;
-  type: "mcp" | "cli" | "builtin";
+  type?: "stdio" | "http";
   command?: string;
   url?: string;
   args?: string[];
   env?: Record<string, string>;
+  headers?: Record<string, string>;
 }
 
 export interface GitHubSource {

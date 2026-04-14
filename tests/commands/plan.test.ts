@@ -70,7 +70,6 @@ async function setupProject(dir: string) {
     toYaml({
       name: "my-mcp",
       description: "MCP Server",
-      type: "mcp",
       command: "node",
       args: ["server.js"],
     })
@@ -211,7 +210,6 @@ describe("buildSyncPlan", () => {
       toYaml({
         name: "env-tool",
         description: "Tool with env var",
-        type: "mcp",
         command: "node",
         env: { TOKEN: "$AGSYNC_PLAN_TEST_VAR" },
       })

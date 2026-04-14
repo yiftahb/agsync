@@ -75,7 +75,7 @@ describe("expandMcpEnv", () => {
 
   it("passes through tools without env", () => {
     const servers: McpDefinition[] = [
-      { name: "t", description: "d", type: "cli", command: "echo" },
+      { name: "t", description: "d", command: "echo" },
     ];
     const { mcp: result, warnings } = expandMcpEnv(servers);
     expect(result).toEqual(servers);
@@ -84,7 +84,7 @@ describe("expandMcpEnv", () => {
 
   it("expands env values in tools", () => {
     const servers: McpDefinition[] = [
-      { name: "t", description: "d", type: "mcp", command: "node", env: { KEY: "$SECRET" } },
+      { name: "t", description: "d", command: "node", env: { KEY: "$SECRET" } },
     ];
     const { mcp: result } = expandMcpEnv(servers);
     expect(result[0].env).toEqual({ KEY: "s3cret" });
@@ -93,7 +93,7 @@ describe("expandMcpEnv", () => {
   it("returns warnings for missing env vars", () => {
     delete process.env.NOPE;
     const servers: McpDefinition[] = [
-      { name: "my-tool", description: "d", type: "mcp", env: { API_KEY: "$NOPE" } },
+      { name: "my-tool", description: "d", env: { API_KEY: "$NOPE" } },
     ];
     const { mcp: result, warnings } = expandMcpEnv(servers);
     expect(result[0].env).toEqual({ API_KEY: "" });
@@ -102,7 +102,7 @@ describe("expandMcpEnv", () => {
 
   it("does not mutate original tools", () => {
     const servers: McpDefinition[] = [
-      { name: "t", description: "d", type: "mcp", env: { KEY: "$SECRET" } },
+      { name: "t", description: "d", env: { KEY: "$SECRET" } },
     ];
     expandMcpEnv(servers);
     expect(servers[0].env!.KEY).toBe("$SECRET");
@@ -113,7 +113,7 @@ describe("expandMcpEnv", () => {
 describe("findEnvReferences", () => {
   it("finds $VAR references", () => {
     const servers: McpDefinition[] = [
-      { name: "t", description: "d", type: "mcp", env: { KEY: "$MY_VAR" } },
+      { name: "t", description: "d", env: { KEY: "$MY_VAR" } },
     ];
     const refs = findEnvReferences(servers);
     expect(refs).toEqual([{ server: "t", key: "KEY", varName: "MY_VAR" }]);
@@ -121,7 +121,7 @@ describe("findEnvReferences", () => {
 
   it("finds ${VAR} references", () => {
     const servers: McpDefinition[] = [
-      { name: "t", description: "d", type: "mcp", env: { KEY: "${MY_VAR}" } },
+      { name: "t", description: "d", env: { KEY: "${MY_VAR}" } },
     ];
     const refs = findEnvReferences(servers);
     expect(refs).toEqual([{ server: "t", key: "KEY", varName: "MY_VAR" }]);
@@ -129,7 +129,7 @@ describe("findEnvReferences", () => {
 
   it("finds multiple references in one value", () => {
     const servers: McpDefinition[] = [
-      { name: "t", description: "d", type: "mcp", env: { URL: "${HOST}:${PORT}" } },
+      { name: "t", description: "d", env: { URL: "${HOST}:${PORT}" } },
     ];
     const refs = findEnvReferences(servers);
     expect(refs).toHaveLength(2);
@@ -139,21 +139,21 @@ describe("findEnvReferences", () => {
 
   it("returns empty for tools without env", () => {
     const servers: McpDefinition[] = [
-      { name: "t", description: "d", type: "cli", command: "echo" },
+      { name: "t", description: "d", command: "echo" },
     ];
     expect(findEnvReferences(servers)).toEqual([]);
   });
 
   it("returns empty for literal values", () => {
     const servers: McpDefinition[] = [
-      { name: "t", description: "d", type: "mcp", env: { DEBUG: "true" } },
+      { name: "t", description: "d", env: { DEBUG: "true" } },
     ];
     expect(findEnvReferences(servers)).toEqual([]);
   });
 
   it("ignores $VAR references in args", () => {
     const servers: McpDefinition[] = [
-      { name: "t", description: "d", type: "mcp", args: ["--key", "$API_KEY"] },
+      { name: "t", description: "d", args: ["--key", "$API_KEY"] },
     ];
     const refs = findEnvReferences(servers);
     expect(refs).toEqual([]);

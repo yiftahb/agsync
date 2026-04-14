@@ -129,7 +129,7 @@ describe("loadHierarchicalConfig", () => {
     await mkdir(join(childDir, ".agsync", "mcp"), { recursive: true });
     await writeFile(
       join(childDir, ".agsync", "mcp", "db.yaml"),
-      toYaml({ name: "db", description: "Database tool", type: "mcp", command: "db-server" })
+      toYaml({ name: "db", description: "Database tool", command: "db-server" })
     );
 
     const result = await loadHierarchicalConfig(tempDir);

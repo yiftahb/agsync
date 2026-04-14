@@ -87,7 +87,6 @@ Help the user with coding tasks
     toYaml({
       name: "my-mcp",
       description: "MCP Server",
-      type: "mcp",
       command: "node",
       args: ["server.js"],
     })
@@ -267,7 +266,6 @@ describe("runSync", () => {
         toYaml({
           name: "env-tool",
           description: "Tool with env var",
-          type: "mcp",
           command: "node",
           args: ["server.js"],
           env: { TOKEN: "$TEST_SYNC_SECRET" },
@@ -299,7 +297,6 @@ describe("runSync", () => {
       toYaml({
         name: "bad-env",
         description: "Missing env",
-        type: "mcp",
         command: "node",
         env: { KEY: "$AGSYNC_UNSET_VAR" },
       })

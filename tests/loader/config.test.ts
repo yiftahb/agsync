@@ -98,7 +98,7 @@ describe("loadFullConfig", () => {
     );
 
     await mkdir(join(tempDir, "mcp"), { recursive: true });
-    const tool = { name: "test-tool", description: "A test tool", type: "cli", command: "echo" };
+    const tool = { name: "test-tool", description: "A test tool", command: "echo" };
     await writeFile(join(tempDir, "mcp", "test.yaml"), toYaml(tool));
 
     await writeFile(

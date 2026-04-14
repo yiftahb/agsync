@@ -122,13 +122,21 @@ COMMAND FORMAT
 TOOL FORMAT
   Define MCP servers in .agsync/mcp/*.yaml:
 
+  Stdio (default, type can be omitted):
     name: github
     description: GitHub MCP server
-    type: mcp
     command: npx
     args: ["-y", "@modelcontextprotocol/server-github"]
     env:
       GITHUB_PERSONAL_ACCESS_TOKEN: $GITHUB_PERSONAL_ACCESS_TOKEN
+
+  HTTP (remote):
+    name: remote-api
+    description: Remote MCP server
+    type: http
+    url: https://api.example.com/mcp
+    headers:
+      Authorization: Bearer $API_TOKEN
 
 CONFIG FORMAT
   agsync.yaml defines content sources and agent features:

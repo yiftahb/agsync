@@ -50,7 +50,7 @@ describe("runValidate", () => {
 
     await writeFile(
       join(tempDir, ".agsync", "mcp", "grep.yaml"),
-      toYaml({ name: "grep", description: "Search", type: "cli", command: "grep" })
+      toYaml({ name: "grep", description: "Search", command: "grep" })
     );
 
     await writeFile(
@@ -102,7 +102,6 @@ describe("runValidate", () => {
       toYaml({
         name: "api",
         description: "API server",
-        type: "mcp",
         command: "node",
         env: { TOKEN: "$AGSYNC_MISSING_TOKEN" },
       })
@@ -130,7 +129,6 @@ describe("runValidate", () => {
         toYaml({
           name: "api",
           description: "API server",
-          type: "mcp",
           command: "node",
           env: { TOKEN: "$AGSYNC_SET_TOKEN" },
         })

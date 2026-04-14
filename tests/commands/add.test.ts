@@ -204,7 +204,7 @@ describe("runAddTool", () => {
     expect(file).toContain("github.yaml");
     const content = await readFile(file, "utf-8");
     expect(content).toContain("name: github");
-    expect(content).toContain("type: mcp");
+    expect(content).not.toContain("type:");
   });
 
   it("finds nearest .agsync/ when run from a subdirectory", async () => {
