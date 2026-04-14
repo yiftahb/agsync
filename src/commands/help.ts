@@ -21,9 +21,9 @@ MANAGING COMMANDS
   agsync command add <name>                     Create a new empty command (.md)
   agsync command remove <name>                  Remove a command from .agsync/commands/
 
-MANAGING TOOLS
-  agsync tool add <name>                        Create a new empty tool definition (.yaml)
-  agsync tool remove <name>                     Remove a tool from .agsync/mcp/
+MANAGING MCP TOOLS
+  agsync mcp add <name>                         Create a new empty tool definition (.yaml)
+  agsync mcp remove <name>                      Remove a tool from .agsync/mcp/
 
 MAINTENANCE
   agsync doctor                           Check environment health and enabled agents
@@ -49,7 +49,7 @@ COMMON WORKFLOWS
     agsync sync
 
   Add an MCP tool:
-    agsync tool add github
+    agsync mcp add github
     # Edit .agsync/mcp/github.yaml with server config
     agsync sync
 

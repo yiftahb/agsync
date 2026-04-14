@@ -82,17 +82,7 @@ export function expandMcpEnv(mcps: McpDefinition[]): {
       updates.env = expandedEnv;
     }
 
-    if (def.args) {
-      updates.args = def.args.map((arg) => {
-        const { result, missing } = expandEnvValue(arg);
-        for (const varName of missing) {
-          warnings.push({ server: def.name, key: "args", varName });
-        }
-        return result;
-      });
-    }
-
-    if (!updates.env && !updates.args) return def;
+    if (!updates.env) return def;
     return { ...def, ...updates };
   });
 
@@ -109,15 +99,6 @@ export function findEnvReferences(mcps: McpDefinition[]): EnvReference[] {
         const regex = new RegExp(ENV_VAR_REGEX.source, "g");
         while ((match = regex.exec(value)) !== null) {
           refs.push({ server: def.name, key, varName: match[1] ?? match[2] });
-        }
-      }
-    }
-    if (def.args) {
-      for (const arg of def.args) {
-        let match: RegExpExecArray | null;
-        const regex = new RegExp(ENV_VAR_REGEX.source, "g");
-        while ((match = regex.exec(arg)) !== null) {
-          refs.push({ server: def.name, key: "args", varName: match[1] ?? match[2] });
         }
       }
     }

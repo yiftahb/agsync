@@ -108,31 +108,6 @@ describe("expandMcpEnv", () => {
     expect(servers[0].env!.KEY).toBe("$SECRET");
   });
 
-  it("expands env vars in args", () => {
-    const servers: McpDefinition[] = [
-      { name: "t", description: "d", type: "mcp", command: "node", args: ["--token", "$SECRET"] },
-    ];
-    const { mcp: result } = expandMcpEnv(servers);
-    expect(result[0].args).toEqual(["--token", "s3cret"]);
-  });
-
-  it("returns warnings for missing env vars in args", () => {
-    delete process.env.NOPE;
-    const servers: McpDefinition[] = [
-      { name: "my-tool", description: "d", type: "mcp", args: ["$NOPE"] },
-    ];
-    const { mcp: result, warnings } = expandMcpEnv(servers);
-    expect(result[0].args).toEqual([""]);
-    expect(warnings).toEqual([{ server: "my-tool", key: "args", varName: "NOPE" }]);
-  });
-
-  it("does not mutate original args", () => {
-    const servers: McpDefinition[] = [
-      { name: "t", description: "d", type: "mcp", args: ["$SECRET"] },
-    ];
-    expandMcpEnv(servers);
-    expect(servers[0].args![0]).toBe("$SECRET");
-  });
 });
 
 describe("findEnvReferences", () => {
@@ -176,22 +151,12 @@ describe("findEnvReferences", () => {
     expect(findEnvReferences(servers)).toEqual([]);
   });
 
-  it("finds $VAR references in args", () => {
+  it("ignores $VAR references in args", () => {
     const servers: McpDefinition[] = [
       { name: "t", description: "d", type: "mcp", args: ["--key", "$API_KEY"] },
     ];
     const refs = findEnvReferences(servers);
-    expect(refs).toEqual([{ server: "t", key: "args", varName: "API_KEY" }]);
-  });
-
-  it("finds refs in both env and args", () => {
-    const servers: McpDefinition[] = [
-      { name: "t", description: "d", type: "mcp", env: { TOKEN: "$A" }, args: ["$B"] },
-    ];
-    const refs = findEnvReferences(servers);
-    expect(refs).toHaveLength(2);
-    expect(refs[0]).toEqual({ server: "t", key: "TOKEN", varName: "A" });
-    expect(refs[1]).toEqual({ server: "t", key: "args", varName: "B" });
+    expect(refs).toEqual([]);
   });
 });
 

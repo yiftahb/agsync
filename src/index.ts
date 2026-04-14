@@ -187,11 +187,11 @@ command
     }
   });
 
-const tool = program
-  .command("tool")
-  .description("Manage tools");
+const mcp = program
+  .command("mcp")
+  .description("Manage MCP tools");
 
-tool
+mcp
   .command("add <name>")
   .description("Create a new empty tool definition")
   .option("-d, --dir <path>", "Target directory", process.cwd())
@@ -205,7 +205,7 @@ tool
     }
   });
 
-tool
+mcp
   .command("remove <name>")
   .description("Remove a tool")
   .option("-d, --dir <path>", "Target directory", process.cwd())

@@ -2,8 +2,7 @@
 name: agsync
 description: >
   Expert in agsync, the Git-native CLI that syncs skills, commands, and MCP tools
-  across AI coding agents. Use when working with agsync.yaml, adding or removing
-  skills, syncing configs, or troubleshooting agsync workflows.
+  across AI coding agents. You MUST use this skill when working on agent skills, commands, MCP configurations or agsync (agsync.yaml) directly.
 ---
 
 # agsync
@@ -124,8 +123,8 @@ Commands are `.md` files under `.agsync/commands/`. The filename becomes the sla
 | `agsync skill remove <name>` | Remove a skill |
 | `agsync command add <name>` | Create a new command (.md) |
 | `agsync command remove <name>` | Remove a command |
-| `agsync tool add <name>` | Create a new tool definition (.yaml) |
-| `agsync tool remove <name>` | Remove a tool |
+| `agsync mcp add <name>` | Create a new tool definition (.yaml) |
+| `agsync mcp remove <name>` | Remove a tool |
 | `agsync validate` | Validate config and definitions |
 | `agsync plan [--frozen]` | Preview changes without writing |
 | `agsync sync [--frozen]` | Resolve skills, fetch sources, generate agent configs |

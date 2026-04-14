@@ -63,8 +63,8 @@ npx agsync-cli
 | `agsync skill remove <name>` | Remove a skill |
 | `agsync command add <name>` | Create a new command (.md) |
 | `agsync command remove <name>` | Remove a command |
-| `agsync tool add <name>` | Create a new tool definition (.yaml) |
-| `agsync tool remove <name>` | Remove a tool |
+| `agsync mcp add <name>` | Create a new tool definition (.yaml) |
+| `agsync mcp remove <name>` | Remove a tool |
 | `agsync validate` | Validate config, skills, commands, and tool references |
 | `agsync plan [--frozen]` | Preview changes without writing files |
 | `agsync sync [--frozen]` | Generate output for all enabled agents |
@@ -94,7 +94,7 @@ project/
 - Each subfolder with `.agsync/instructions.md` gets its own `AGENTS.md` generated in-place
 - The root `AGENTS.md` cross-references scoped instructions: *"When working in folder: `frontend` — you MUST load `frontend/AGENTS.md`"*
 - Agent symlinks (`CLAUDE.md`, `.claude/skills/`) are only created at the root
-- `agsync skill add`, `command add`, `tool add` resolve the nearest `.agsync/` upwards, so running from `frontend/` adds to `frontend/.agsync/`
+- `agsync skill add`, `command add`, `mcp add` resolve the nearest `.agsync/` upwards, so running from `frontend/` adds to `frontend/.agsync/`
 
 ## License
 
