@@ -177,18 +177,13 @@ function buildMcpServerEntry(def: McpDefinition, agentName: string): Record<stri
       if (hasHeaders) entry.headers = def.headers;
       return entry;
     }
-    if (agentName === "copilot") {
-      const entry: Record<string, unknown> = { type: "http", url: def.url ?? "" };
-      if (hasHeaders) entry.headers = def.headers;
-      return entry;
-    }
     if (agentName === "opencode") {
       const entry: Record<string, unknown> = { type: "remote", url: def.url ?? "" };
       if (hasHeaders) entry.headers = def.headers;
       return entry;
     }
 
-    const entry: Record<string, unknown> = { url: def.url ?? "" };
+    const entry: Record<string, unknown> = { type: "http", url: def.url ?? "" };
     if (hasHeaders && agentName !== "codex") entry.headers = def.headers;
     return entry;
   }
