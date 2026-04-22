@@ -56,7 +56,7 @@ agsync sync
 
 | Agent | File | Format |
 |-------|------|--------|
-| Claude | `.claude/settings.json` | JSON (`mcpServers`) |
+| Claude | `.mcp.json` | JSON (`mcpServers`) |
 | Cursor | `.cursor/mcp.json` | JSON (`mcpServers`) |
 | Codex | `.codex/config.toml` | TOML (`[mcp_servers]`) |
 | Windsurf | `.windsurf/mcp_config.json` | JSON (`mcpServers`) |

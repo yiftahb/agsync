@@ -33,7 +33,7 @@ describe("getAgentRegistry", () => {
       type: "symlink",
     });
     expect(registry.claude.features.mcp).toMatchObject({
-      destination: ".claude/settings.json",
+      destination: ".mcp.json",
       type: "generated",
       merge_strategy: "merge",
     });

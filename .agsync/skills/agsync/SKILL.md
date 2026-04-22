@@ -52,7 +52,7 @@ project/
 ├── CLAUDE.md → AGENTS.md               # Symlink
 ├── .claude/skills/ → .agents/skills/    # Symlink
 ├── .cursor/skills/ → .agents/skills/    # Symlink
-├── .claude/settings.json                # Generated MCP config
+├── .mcp.json                            # Generated MCP config (Claude)
 ├── .cursor/mcp.json                     # Generated MCP config
 └── .codex/config.toml                   # Generated MCP config (TOML)
 ```

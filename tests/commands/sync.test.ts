@@ -199,11 +199,11 @@ describe("runSync", () => {
     expect(s.isSymbolicLink()).toBe(true);
   });
 
-  it("generates Claude MCP JSON at .claude/settings.json", async () => {
+  it("generates Claude MCP JSON at .mcp.json", async () => {
     await setupProject(tempDir);
     await runSync(tempDir);
 
-    const content = await readFile(join(tempDir, ".claude", "settings.json"), "utf-8");
+    const content = await readFile(join(tempDir, ".mcp.json"), "utf-8");
     const parsed = JSON.parse(content);
     expect(parsed.mcpServers["my-mcp"]).toBeDefined();
   });
@@ -275,7 +275,7 @@ describe("runSync", () => {
       expect(warnings).toHaveLength(0);
 
       const claude = JSON.parse(
-        await readFile(join(tempDir, ".claude", "settings.json"), "utf-8")
+        await readFile(join(tempDir, ".mcp.json"), "utf-8")
       );
       expect(claude.mcpServers["env-tool"].env.TOKEN).toBe("expanded-value");
 
@@ -307,7 +307,7 @@ describe("runSync", () => {
     expect(written.length).toBeGreaterThan(0);
 
     const claude = JSON.parse(
-      await readFile(join(tempDir, ".claude", "settings.json"), "utf-8")
+      await readFile(join(tempDir, ".mcp.json"), "utf-8")
     );
     expect(claude.mcpServers["bad-env"].env.KEY).toBe("");
   });
@@ -350,7 +350,7 @@ Body
     const gitignore = await readFile(join(tempDir, ".gitignore"), "utf-8");
     expect(gitignore).toContain("# agsync:begin");
     expect(gitignore).toContain("# agsync:end");
-    expect(gitignore).toContain(".claude/settings.json");
+    expect(gitignore).toContain(".mcp.json");
     expect(gitignore).toContain(".cursor/mcp.json");
     expect(gitignore).toContain(".codex/config.toml");
     expect(gitignore).not.toContain("AGENTS.md");
@@ -524,7 +524,7 @@ Body
     });
     await runSync(tempDir);
 
-    await expect(stat(join(tempDir, ".claude", "settings.json"))).rejects.toThrow();
+    await expect(stat(join(tempDir, ".mcp.json"))).rejects.toThrow();
     await expect(stat(join(tempDir, ".cursor", "mcp.json"))).rejects.toThrow();
   });
 

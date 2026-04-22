@@ -225,7 +225,7 @@ GENERATED OUTPUT
   GEMINI.md                         Symlink → AGENTS.md (root only)
   .claude/skills/                   Symlink → .agents/skills/ (root only)
   .cursor/skills/                   Symlink → .agents/skills/ (root only)
-  .claude/settings.json             Generated MCP config
+  .mcp.json                         Generated MCP config (Claude)
   .cursor/mcp.json                  Generated MCP config
   .codex/config.toml                Generated MCP config (TOML)
 

@@ -55,7 +55,7 @@ agents:
   #     # destination: .claude/commands            # default
   #   mcp:
   #     enabled: true
-  #     # destination: .claude/settings.json       # default
+  #     # destination: .mcp.json                    # default
   #     # merge_strategy: merge                    # default
 
   # ── Codex ──────────────────────────────────────────────────

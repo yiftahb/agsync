@@ -17,6 +17,20 @@ const SAMPLE_CONFIG = {
   agents: {},
 };
 
+const AGSYNC_SKILL_MD = `---
+name: agsync
+description: Expert in agsync, the Git-native CLI that syncs skills, commands,
+  and MCP tools across AI coding agents. You MUST use this skill when working on
+  agent skills, commands, MCP configurations or agsync (agsync.yaml) directly.
+source:
+  registry: github
+  org: yiftahb
+  repo: agsync
+  path: .agsync/skills/agsync
+  version: v1.5.0
+---
+`;
+
 const INSTRUCTIONS_MD = `## Overview
 
 This project uses agsync to manage AI agent configurations.
@@ -57,6 +71,12 @@ export async function runInit(targetDir: string): Promise<string[]> {
   const instructionsPath = resolve(targetDir, ".agsync", "instructions.md");
   await writeFile(instructionsPath, INSTRUCTIONS_MD, "utf-8");
   created.push(".agsync/instructions.md");
+
+  const skillDir = resolve(targetDir, ".agsync", "skills", "agsync");
+  await mkdir(skillDir, { recursive: true });
+  const skillPath = resolve(skillDir, "SKILL.md");
+  await writeFile(skillPath, AGSYNC_SKILL_MD, "utf-8");
+  created.push(".agsync/skills/agsync/SKILL.md");
 
   return created;
 }

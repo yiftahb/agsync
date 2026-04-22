@@ -4,7 +4,7 @@ dist/
 coverage/
 .cursor
 .cursor/mcp.json
-.claude/settings.json
+.mcp.json
 
 # agsync:begin
 .agents/

@@ -113,7 +113,7 @@ describe("buildSyncPlan", () => {
     expect(paths).toContainEqual(join(tempDir, ".agents", "skills", "helper", "SKILL.md"));
     expect(paths).toContainEqual(join(tempDir, "AGENTS.md"));
     expect(paths).toContainEqual(join(tempDir, "CLAUDE.md"));
-    expect(paths).toContainEqual(join(tempDir, ".claude", "settings.json"));
+    expect(paths).toContainEqual(join(tempDir, ".mcp.json"));
     expect(paths).toContainEqual(join(tempDir, ".cursor", "mcp.json"));
 
     const symlinkEntry = plan.files.find((f) => f.path === join(tempDir, ".claude", "skills"));

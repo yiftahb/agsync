@@ -17,7 +17,7 @@
 
 | Agent | Instructions | Skills | Commands | MCP |
 |-------|-------------|--------|----------|-----|
-| Claude Code | `CLAUDE.md` | `.claude/skills/` | `.claude/commands/` | `.claude/settings.json` |
+| Claude Code | `CLAUDE.md` | `.claude/skills/` | `.claude/commands/` | `.mcp.json` |
 | Cursor | `AGENTS.md` | `.cursor/skills/` | `.cursor/commands/` | `.cursor/mcp.json` |
 | Codex | `.codex/instructions.md` | `.codex/skills/` | `.codex/commands/` | `.codex/config.toml` |
 | Windsurf | `AGENTS.md` | `.windsurf/skills/` | `.windsurf/commands/` | `.windsurf/mcp_config.json` |

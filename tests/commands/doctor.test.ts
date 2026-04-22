@@ -59,7 +59,7 @@ describe("runDoctor", () => {
         skills: { enabled: true, destination: ".claude/skills", type: "symlink" },
         mcp: {
           enabled: true,
-          destination: ".claude/settings.json",
+          destination: ".mcp.json",
           type: "generated",
           merge_strategy: "merge",
           mcp_format: { format: "json", root_key: "mcpServers" },

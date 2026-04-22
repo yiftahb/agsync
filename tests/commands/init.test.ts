@@ -24,9 +24,16 @@ describe("runInit", () => {
     expect(created).toContain(".agsync/mcp/");
   });
 
-  it("does not create a default skill", async () => {
+  it("creates the agsync skill", async () => {
     const created = await runInit(tempDir);
-    expect(created).not.toContain(".agsync/skills/default/SKILL.md");
+    expect(created).toContain(".agsync/skills/agsync/SKILL.md");
+
+    const content = await readFile(
+      join(tempDir, ".agsync", "skills", "agsync", "SKILL.md"),
+      "utf-8"
+    );
+    expect(content).toContain("name: agsync");
+    expect(content).toContain("registry: github");
   });
 
   it("creates .agsync/instructions.md", async () => {

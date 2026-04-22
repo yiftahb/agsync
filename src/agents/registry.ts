@@ -10,7 +10,7 @@ const AGENT_REGISTRY: Record<string, AgentDefinition> = {
       commands: { enabled: false, destination: ".claude/commands", type: "symlink" },
       mcp: {
         enabled: false,
-        destination: ".claude/settings.json",
+        destination: ".mcp.json",
         type: "generated",
         merge_strategy: "merge",
         mcp_format: { format: "json", root_key: "mcpServers" },
