@@ -82,7 +82,19 @@ export function expandMcpEnv(mcps: McpDefinition[]): {
       updates.env = expandedEnv;
     }
 
-    if (!updates.env) return def;
+    if (def.headers) {
+      const expandedHeaders: Record<string, string> = {};
+      for (const [key, value] of Object.entries(def.headers)) {
+        const { result, missing } = expandEnvValue(value);
+        expandedHeaders[key] = result;
+        for (const varName of missing) {
+          warnings.push({ server: def.name, key, varName });
+        }
+      }
+      updates.headers = expandedHeaders;
+    }
+
+    if (!updates.env && !updates.headers) return def;
     return { ...def, ...updates };
   });
 
@@ -95,6 +107,16 @@ export function findEnvReferences(mcps: McpDefinition[]): EnvReference[] {
   for (const def of mcps) {
     if (def.env) {
       for (const [key, value] of Object.entries(def.env)) {
+        let match: RegExpExecArray | null;
+        const regex = new RegExp(ENV_VAR_REGEX.source, "g");
+        while ((match = regex.exec(value)) !== null) {
+          refs.push({ server: def.name, key, varName: match[1] ?? match[2] });
+        }
+      }
+    }
+
+    if (def.headers) {
+      for (const [key, value] of Object.entries(def.headers)) {
         let match: RegExpExecArray | null;
         const regex = new RegExp(ENV_VAR_REGEX.source, "g");
         while ((match = regex.exec(value)) !== null) {

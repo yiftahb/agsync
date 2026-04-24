@@ -108,6 +108,41 @@ describe("expandMcpEnv", () => {
     expect(servers[0].env!.KEY).toBe("$SECRET");
   });
 
+  it("expands header values", () => {
+    const servers: McpDefinition[] = [
+      { name: "t", description: "d", type: "http", url: "https://example.com", headers: { Authorization: "Bearer $SECRET" } },
+    ];
+    const { mcp: result } = expandMcpEnv(servers);
+    expect(result[0].headers).toEqual({ Authorization: "Bearer s3cret" });
+  });
+
+  it("returns warnings for missing header vars", () => {
+    delete process.env.MISSING_TOKEN;
+    const servers: McpDefinition[] = [
+      { name: "api", description: "d", type: "http", url: "https://example.com", headers: { Authorization: "Bearer $MISSING_TOKEN" } },
+    ];
+    const { mcp: result, warnings } = expandMcpEnv(servers);
+    expect(result[0].headers).toEqual({ Authorization: "Bearer " });
+    expect(warnings).toEqual([{ server: "api", key: "Authorization", varName: "MISSING_TOKEN" }]);
+  });
+
+  it("passes through http tools without headers or env", () => {
+    const servers: McpDefinition[] = [
+      { name: "t", description: "d", type: "http", url: "https://example.com" },
+    ];
+    const { mcp: result, warnings } = expandMcpEnv(servers);
+    expect(result).toEqual(servers);
+    expect(warnings).toEqual([]);
+  });
+
+  it("does not mutate original headers", () => {
+    const servers: McpDefinition[] = [
+      { name: "t", description: "d", type: "http", url: "https://example.com", headers: { Authorization: "$SECRET" } },
+    ];
+    expandMcpEnv(servers);
+    expect(servers[0].headers!.Authorization).toBe("$SECRET");
+  });
+
 });
 
 describe("findEnvReferences", () => {
@@ -157,6 +192,31 @@ describe("findEnvReferences", () => {
     ];
     const refs = findEnvReferences(servers);
     expect(refs).toEqual([]);
+  });
+
+  it("finds references in headers", () => {
+    const servers: McpDefinition[] = [
+      { name: "t", description: "d", type: "http", url: "https://example.com", headers: { Authorization: "Bearer $API_TOKEN" } },
+    ];
+    const refs = findEnvReferences(servers);
+    expect(refs).toEqual([{ server: "t", key: "Authorization", varName: "API_TOKEN" }]);
+  });
+
+  it("finds references in both env and headers", () => {
+    const servers: McpDefinition[] = [
+      { name: "t", description: "d", env: { KEY: "$ENV_VAR" }, headers: { "X-Key": "$HEADER_VAR" } },
+    ];
+    const refs = findEnvReferences(servers);
+    expect(refs).toHaveLength(2);
+    expect(refs[0]).toEqual({ server: "t", key: "KEY", varName: "ENV_VAR" });
+    expect(refs[1]).toEqual({ server: "t", key: "X-Key", varName: "HEADER_VAR" });
+  });
+
+  it("returns empty for headers with literal values", () => {
+    const servers: McpDefinition[] = [
+      { name: "t", description: "d", type: "http", url: "https://example.com", headers: { "Content-Type": "application/json" } },
+    ];
+    expect(findEnvReferences(servers)).toEqual([]);
   });
 });
 
