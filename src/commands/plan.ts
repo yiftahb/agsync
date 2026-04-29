@@ -61,7 +61,7 @@ export function formatPlan(plan: SyncPlan, baseDir: string): string {
 
 export async function runPlan(
   targetDir: string,
-  options?: { frozen?: boolean }
+  options?: { frozen?: boolean; namespace?: string }
 ): Promise<SyncPlan> {
-  return buildSyncPlan(targetDir, { frozen: options?.frozen });
+  return buildSyncPlan(targetDir, { frozen: options?.frozen, namespace: options?.namespace });
 }

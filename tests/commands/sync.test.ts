@@ -312,6 +312,88 @@ describe("runSync", () => {
     expect(claude.mcpServers["bad-env"].env.KEY).toBe("");
   });
 
+  it("includes all MCPs when no namespace is provided", async () => {
+    await setupProject(tempDir);
+    await writeFile(
+      join(tempDir, ".agsync", "mcp", "ci.yaml"),
+      toYaml({
+        name: "ci-mcp",
+        description: "CI MCP",
+        namespaces: ["ci-cd"],
+        command: "node",
+        args: ["ci.js"],
+      })
+    );
+    await writeFile(
+      join(tempDir, ".agsync", "mcp", "agent.yaml"),
+      toYaml({
+        name: "agent-mcp",
+        description: "Agent MCP",
+        namespaces: ["coding-agents"],
+        command: "node",
+        args: ["agent.js"],
+      })
+    );
+
+    await runSync(tempDir);
+
+    const claude = JSON.parse(await readFile(join(tempDir, ".mcp.json"), "utf-8"));
+    expect(claude.mcpServers["my-mcp"]).toBeDefined();
+    expect(claude.mcpServers["ci-mcp"]).toBeDefined();
+    expect(claude.mcpServers["agent-mcp"]).toBeDefined();
+  });
+
+  it("includes only namespace-tagged + untagged MCPs when --namespace ci-cd is passed", async () => {
+    await setupProject(tempDir);
+    await writeFile(
+      join(tempDir, ".agsync", "mcp", "ci.yaml"),
+      toYaml({
+        name: "ci-mcp",
+        description: "CI MCP",
+        namespaces: ["ci-cd"],
+        command: "node",
+        args: ["ci.js"],
+      })
+    );
+    await writeFile(
+      join(tempDir, ".agsync", "mcp", "agent.yaml"),
+      toYaml({
+        name: "agent-mcp",
+        description: "Agent MCP",
+        namespaces: ["coding-agents"],
+        command: "node",
+        args: ["agent.js"],
+      })
+    );
+
+    await runSync(tempDir, { namespace: "ci-cd" });
+
+    const claude = JSON.parse(await readFile(join(tempDir, ".mcp.json"), "utf-8"));
+    expect(claude.mcpServers["my-mcp"]).toBeDefined();
+    expect(claude.mcpServers["ci-mcp"]).toBeDefined();
+    expect(claude.mcpServers["agent-mcp"]).toBeUndefined();
+  });
+
+  it("includes only untagged MCPs when --namespace matches no tagged server", async () => {
+    await setupProject(tempDir);
+    await writeFile(
+      join(tempDir, ".agsync", "mcp", "ci.yaml"),
+      toYaml({
+        name: "ci-mcp",
+        description: "CI MCP",
+        namespaces: ["ci-cd"],
+        command: "node",
+        args: ["ci.js"],
+      })
+    );
+
+    await runSync(tempDir, { namespace: "nope" });
+
+    const claude = JSON.parse(await readFile(join(tempDir, ".mcp.json"), "utf-8"));
+    expect(claude.mcpServers["my-mcp"]).toBeDefined();
+    expect(claude.mcpServers["ci-mcp"]).toBeUndefined();
+  });
+
   it("throws on validation errors", async () => {
     const skillDir = join(tempDir, ".agsync", "skills", "bad");
     await mkdir(skillDir, { recursive: true });

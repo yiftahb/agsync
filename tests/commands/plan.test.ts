@@ -246,6 +246,87 @@ describe("buildSyncPlan", () => {
     await expect(buildSyncPlan(tempDir)).rejects.toThrow("Validation failed");
   });
 
+  it("filters MCPs by namespace when option is passed", async () => {
+    await setupProject(tempDir);
+    await writeFile(
+      join(tempDir, ".agsync", "mcp", "ci.yaml"),
+      toYaml({
+        name: "ci-mcp",
+        description: "CI MCP",
+        namespaces: ["ci-cd"],
+        command: "node",
+        args: ["ci.js"],
+      })
+    );
+
+    const planAll = await buildSyncPlan(tempDir);
+    const mcpAll = planAll.files.find((f) => f.path === join(tempDir, ".mcp.json"));
+    expect(mcpAll!.content).toContain("ci-mcp");
+    expect(mcpAll!.content).toContain("my-mcp");
+
+    const planFiltered = await buildSyncPlan(tempDir, { namespace: "ci-cd" });
+    const mcpFiltered = planFiltered.files.find((f) => f.path === join(tempDir, ".mcp.json"));
+    expect(mcpFiltered!.content).toContain("ci-mcp");
+    expect(mcpFiltered!.content).toContain("my-mcp");
+
+    const planOther = await buildSyncPlan(tempDir, { namespace: "nope" });
+    const mcpOther = planOther.files.find((f) => f.path === join(tempDir, ".mcp.json"));
+    expect(mcpOther!.content).not.toContain("ci-mcp");
+    expect(mcpOther!.content).toContain("my-mcp");
+  });
+
+  it("warns when a skill references an MCP excluded by the active namespace", async () => {
+    await setupProject(tempDir);
+    await writeFile(
+      join(tempDir, ".agsync", "mcp", "ci.yaml"),
+      toYaml({
+        name: "ci-mcp",
+        description: "CI MCP",
+        namespaces: ["ci-cd"],
+        command: "node",
+        args: ["ci.js"],
+      })
+    );
+    await writeFile(
+      join(tempDir, ".agsync", "skills", "helper", "SKILL.md"),
+      skillMd(
+        { name: "helper", description: "Uses CI", tools: ["ci-mcp"] },
+        "Help"
+      )
+    );
+
+    const plan = await buildSyncPlan(tempDir, { namespace: "coding-agents" });
+    expect(
+      plan.warnings.some(
+        (w) => w.includes("ci-mcp") && w.includes("coding-agents")
+      )
+    ).toBe(true);
+  });
+
+  it("does not warn about excluded MCPs when no namespace is active", async () => {
+    await setupProject(tempDir);
+    await writeFile(
+      join(tempDir, ".agsync", "mcp", "ci.yaml"),
+      toYaml({
+        name: "ci-mcp",
+        description: "CI MCP",
+        namespaces: ["ci-cd"],
+        command: "node",
+        args: ["ci.js"],
+      })
+    );
+    await writeFile(
+      join(tempDir, ".agsync", "skills", "helper", "SKILL.md"),
+      skillMd(
+        { name: "helper", description: "Uses CI", tools: ["ci-mcp"] },
+        "Help"
+      )
+    );
+
+    const plan = await buildSyncPlan(tempDir);
+    expect(plan.warnings.some((w) => w.includes("excluded by --namespace"))).toBe(false);
+  });
+
   it("detects stale skills in canonical output dir", async () => {
     await setupProject(tempDir);
     await mkdir(join(tempDir, ".agents", "skills", "stale-skill"), { recursive: true });

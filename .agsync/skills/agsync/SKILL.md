@@ -103,6 +103,33 @@ External skills are pinned to exact versions via `source.version`. A lock file (
 
 Use `--frozen` with `sync` or `plan` in CI to enforce the lock file — the command fails if the lock is missing or stale.
 
+## MCP Namespaces
+
+Tag MCP servers with one or more namespaces (e.g. `ci-cd`, `coding-agents`) and filter at sync time. Useful when CI runners and local coding agents need different sets of servers.
+
+```yaml
+# .agsync/mcp/github-actions.yaml
+name: github-actions
+description: GitHub Actions MCP server
+namespaces: [ci-cd]
+command: npx
+args: ["-y", "@modelcontextprotocol/server-github-actions"]
+```
+
+Filter at sync time:
+
+```bash
+agsync sync --namespace ci-cd          # only ci-cd-tagged + untagged servers
+agsync sync --namespace coding-agents  # only coding-agents-tagged + untagged servers
+agsync sync                            # all servers (no filter)
+```
+
+Rules:
+
+- `namespaces` is optional. MCPs without it (or with an empty array) are **always included** (treat as global).
+- A skill that references an MCP excluded by the active namespace produces a warning, not an error.
+- Scaffold a tagged MCP with `agsync mcp add <name> --namespace ci-cd` (repeat the flag to add multiple).
+
 ## Commands
 
 Commands are `.md` files under `.agsync/commands/`. The filename becomes the slash command name.
@@ -123,11 +150,11 @@ Commands are `.md` files under `.agsync/commands/`. The filename becomes the sla
 | `agsync skill remove <name>` | Remove a skill |
 | `agsync command add <name>` | Create a new command (.md) |
 | `agsync command remove <name>` | Remove a command |
-| `agsync mcp add <name>` | Create a new tool definition (.yaml) |
+| `agsync mcp add <name> [--namespace <ns...>]` | Create a new tool definition (.yaml), optionally tagged |
 | `agsync mcp remove <name>` | Remove a tool |
 | `agsync validate` | Validate config and definitions |
-| `agsync plan [--frozen]` | Preview changes without writing |
-| `agsync sync [--frozen]` | Resolve skills, fetch sources, generate agent configs |
+| `agsync plan [--frozen] [--namespace <name>]` | Preview changes without writing |
+| `agsync sync [--frozen] [--namespace <name>]` | Resolve skills, fetch sources, generate agent configs |
 | `agsync doctor` | Check environment health |
 | `agsync version` | Show version and check for updates |
 | `agsync update` | Update to latest version |

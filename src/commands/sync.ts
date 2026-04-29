@@ -250,9 +250,19 @@ async function listSubdirectories(dir: string): Promise<string[]> {
   }
 }
 
+export function filterMcpsByNamespace(
+  mcps: McpDefinition[],
+  namespace?: string
+): McpDefinition[] {
+  if (!namespace) return mcps;
+  return mcps.filter(
+    (m) => !m.namespaces || m.namespaces.length === 0 || m.namespaces.includes(namespace)
+  );
+}
+
 export async function buildSyncPlan(
   targetDir: string,
-  options?: { expandEnv?: boolean; frozen?: boolean }
+  options?: { expandEnv?: boolean; frozen?: boolean; namespace?: string }
 ): Promise<SyncPlan> {
   const allErrors = await runValidate(targetDir);
   const hardErrors = allErrors.filter((e) => e.severity !== "warn");
@@ -287,6 +297,22 @@ export async function buildSyncPlan(
     mcps = expanded.mcp;
     for (const w of expanded.warnings) {
       warnings.push(`Environment variable "${w.varName}" is not set (mcp "${w.server}", key "${w.key}")`);
+    }
+  }
+
+  const namespace = options?.namespace;
+  if (namespace) {
+    const allMcpNames = new Set(mcps.map((m) => m.name));
+    mcps = filterMcpsByNamespace(mcps, namespace);
+    const filteredMcpNames = new Set(mcps.map((m) => m.name));
+    for (const skill of resolvedSkills) {
+      for (const toolRef of skill.tools ?? []) {
+        if (allMcpNames.has(toolRef) && !filteredMcpNames.has(toolRef)) {
+          warnings.push(
+            `Skill "${skill.name}" references MCP "${toolRef}" which is excluded by --namespace ${namespace}`
+          );
+        }
+      }
     }
   }
 
@@ -758,7 +784,7 @@ async function manageGitignore(
 
 export async function runSync(
   targetDir: string,
-  options?: { frozen?: boolean }
+  options?: { frozen?: boolean; namespace?: string }
 ): Promise<{ written: string[]; warnings: string[] }> {
   const loaded = await loadHierarchicalConfig(targetDir);
   if (!loaded) {
@@ -766,7 +792,7 @@ export async function runSync(
   }
 
   const frozen = options?.frozen ?? false;
-  const plan = await buildSyncPlan(targetDir, { frozen });
+  const plan = await buildSyncPlan(targetDir, { frozen, namespace: options?.namespace });
   const written = await applySyncPlan(plan);
 
   if (!frozen && plan.lockUpdates) {

@@ -8,8 +8,8 @@ USAGE
 GETTING STARTED
   agsync init                             Scaffold a new project with agsync.yaml
   agsync validate                         Validate config and all definitions
-  agsync plan                             Preview changes without writing files
-  agsync sync                             Generate output for all enabled agents
+  agsync plan [--namespace <ns>]          Preview changes without writing files
+  agsync sync [--namespace <ns>]          Generate output for all enabled agents
 
 MANAGING SKILLS
   agsync skill add <name>                       Create a local empty skill
@@ -23,6 +23,7 @@ MANAGING COMMANDS
 
 MANAGING MCP TOOLS
   agsync mcp add <name>                         Create a new empty tool definition (.yaml)
+  agsync mcp add <name> --namespace <ns...>     Create a tool tagged with one or more namespaces
   agsync mcp remove <name>                      Remove a tool from .agsync/mcp/
 
 MAINTENANCE
@@ -137,6 +138,26 @@ TOOL FORMAT
     url: https://api.example.com/mcp
     headers:
       Authorization: Bearer $API_TOKEN
+
+MCP NAMESPACES
+  Tag MCP servers with one or more namespaces and filter at sync time.
+  Useful when CI runners and local coding agents need different sets of servers.
+
+    name: github-actions
+    description: GitHub Actions MCP server
+    namespaces: [ci-cd]
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github-actions"]
+
+  Filter at sync time:
+    agsync sync --namespace ci-cd          Only ci-cd-tagged + untagged servers
+    agsync sync --namespace coding-agents  Only coding-agents-tagged + untagged servers
+    agsync plan --namespace ci-cd          Same filter without writing files
+
+  Rules:
+    - namespaces is optional. MCPs without it are always included (global).
+    - A skill that references an excluded MCP produces a warning, not an error.
+    - Scaffold a tagged MCP: agsync mcp add <name> --namespace ci-cd
 
 CONFIG FORMAT
   agsync.yaml defines content sources and agent features:

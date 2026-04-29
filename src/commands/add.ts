@@ -169,16 +169,22 @@ export async function runAddCommand(
 
 export async function runAddTool(
   targetDir: string,
-  toolName: string
+  toolName: string,
+  namespaces?: string[]
 ): Promise<string> {
   const agsyncDir = await resolveAgsyncDir(targetDir);
   const mcpDir = resolve(agsyncDir, "mcp");
   await mkdir(mcpDir, { recursive: true });
   const toolPath = resolve(mcpDir, `${toolName}.yaml`);
-  await writeFile(
-    toolPath,
-    toYaml({ name: toolName, description: "", command: "", args: [] }),
-    "utf-8"
-  );
+  const definition: Record<string, unknown> = {
+    name: toolName,
+    description: "",
+  };
+  if (namespaces && namespaces.length > 0) {
+    definition.namespaces = namespaces;
+  }
+  definition.command = "";
+  definition.args = [];
+  await writeFile(toolPath, toYaml(definition), "utf-8");
   return toolPath;
 }

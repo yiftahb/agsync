@@ -53,6 +53,7 @@ export interface AgentDefinition {
 export interface McpDefinition {
   name: string;
   description: string;
+  namespaces?: string[];
   type?: "stdio" | "http";
   command?: string;
   url?: string;

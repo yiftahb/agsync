@@ -48,6 +48,8 @@ npx agsync-cli
 
 🔌 **MCP Sync** — Define MCP servers in YAML, expand environment variables at sync time, and generate the correct config format (JSON or TOML) per agent with smart merging.
 
+🏷️ **MCP Namespaces** — Tag MCP servers with namespaces (e.g. `ci-cd`, `coding-agents`) and filter at sync time with `agsync sync --namespace <name>` so each environment only gets the servers it needs.
+
 📁 **Monorepo Scoping** — One `agsync.yaml` at the repo root, with `.agsync/` directories in any subfolder. Skills and commands are automatically prefixed (e.g. `frontend:my-skill`), built to the root, and each subfolder gets its own `AGENTS.md` with scoped instructions.
 
 🔒 **Gitignore Management** — Automatically manage `.gitignore` entries for generated output. Choose between `on` (all output), `mcpOnly` (default, MCP configs only), or `off`.
@@ -66,8 +68,8 @@ npx agsync-cli
 | `agsync mcp add <name>` | Create a new tool definition (.yaml) |
 | `agsync mcp remove <name>` | Remove a tool |
 | `agsync validate` | Validate config, skills, commands, and tool references |
-| `agsync plan [--frozen]` | Preview changes without writing files |
-| `agsync sync [--frozen]` | Generate output for all enabled agents |
+| `agsync plan [--frozen] [--namespace <name>]` | Preview changes without writing files |
+| `agsync sync [--frozen] [--namespace <name>]` | Generate output for all enabled agents |
 | `agsync doctor` | Check environment health and enabled agents |
 | `agsync version` | Show current version and check for updates |
 | `agsync update` | Update to the latest version |
@@ -95,6 +97,42 @@ project/
 - The root `AGENTS.md` cross-references scoped instructions: *"When working in folder: `frontend` — you MUST load `frontend/AGENTS.md`"*
 - Agent symlinks (`CLAUDE.md`, `.claude/skills/`) are only created at the root
 - `agsync skill add`, `command add`, `mcp add` resolve the nearest `.agsync/` upwards, so running from `frontend/` adds to `frontend/.agsync/`
+
+## MCP Namespaces
+
+Tag MCP servers with one or more namespaces and filter at sync time. Useful when CI runners and local coding agents need different sets of servers.
+
+```yaml
+# .agsync/mcp/github-actions.yaml
+name: github-actions
+description: GitHub Actions MCP server
+namespaces: [ci-cd]
+command: npx
+args: ["-y", "@modelcontextprotocol/server-github-actions"]
+```
+
+```yaml
+# .agsync/mcp/cursor-tools.yaml
+name: cursor-tools
+description: Tools for the local coding agent
+namespaces: [coding-agents]
+command: npx
+args: ["-y", "@some/cursor-tools"]
+```
+
+Sync only the servers tagged for a namespace:
+
+```bash
+agsync sync --namespace ci-cd          # only ci-cd-tagged + untagged servers
+agsync sync --namespace coding-agents  # only coding-agents-tagged + untagged servers
+agsync sync                            # all servers (no filter)
+```
+
+Rules:
+
+- `namespaces` is optional. MCPs without it (or with an empty array) are **always included** — treat them as global.
+- A skill that references an MCP excluded by the active namespace produces a warning, not an error.
+- Scaffold a tagged MCP with `agsync mcp add <name> --namespace ci-cd` (repeat the flag to add multiple).
 
 ## License
 

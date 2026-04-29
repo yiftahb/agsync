@@ -3,6 +3,7 @@ import { z } from "zod";
 export const mcpDefinitionSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
+  namespaces: z.array(z.string().min(1)).optional(),
   type: z.enum(["stdio", "http"]).optional(),
   command: z.string().optional(),
   url: z.string().optional(),

@@ -32,12 +32,36 @@ headers:
 |-------|----------|-------------|
 | name | Yes | Tool identifier |
 | description | Yes | What this tool does |
+| namespaces | No | Array of namespace tags for filtering with `agsync sync --namespace <name>` |
 | type | No | `stdio` (default) or `http` |
 | command | For stdio | Command to run |
 | args | No | Command arguments (stdio only) |
 | env | No | Environment variables (supports `$VAR` expansion) |
 | url | For http | Remote server URL |
 | headers | No | HTTP headers (http only, not supported by all agents) |
+
+## Namespaces
+
+Tag servers with one or more namespaces and filter at sync time. Useful when CI runners and local coding agents need different sets of servers.
+
+```yaml
+# .agsync/mcp/github-actions.yaml
+name: github-actions
+description: GitHub Actions MCP server
+namespaces: [ci-cd]
+command: npx
+args: ["-y", "@modelcontextprotocol/server-github-actions"]
+```
+
+```bash
+agsync sync --namespace ci-cd          # only ci-cd-tagged + untagged servers
+agsync sync --namespace coding-agents  # only coding-agents-tagged + untagged servers
+agsync sync                            # all servers (no filter)
+```
+
+- `namespaces` is optional. Servers without it are **always included** (treated as global).
+- A skill that references a server excluded by the active namespace produces a warning, not an error.
+- Scaffold a tagged server: `agsync mcp add <name> --namespace ci-cd` (repeat the flag for multiple).
 
 ## Environment Variable Expansion
 

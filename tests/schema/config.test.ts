@@ -276,4 +276,43 @@ describe("mcpDefinitionSchema", () => {
       mcpDefinitionSchema.parse({ name: "x", description: "x", type: "unknown" })
     ).toThrow();
   });
+
+  it("accepts an optional namespaces array", () => {
+    const result = mcpDefinitionSchema.parse({
+      name: "ci-tool",
+      description: "CI MCP server",
+      namespaces: ["ci-cd", "automation"],
+      command: "node",
+    });
+    expect(result.namespaces).toEqual(["ci-cd", "automation"]);
+  });
+
+  it("treats missing namespaces as undefined (global)", () => {
+    const result = mcpDefinitionSchema.parse({
+      name: "global-tool",
+      description: "Always-on tool",
+      command: "node",
+    });
+    expect(result.namespaces).toBeUndefined();
+  });
+
+  it("rejects non-string entries in namespaces", () => {
+    expect(() =>
+      mcpDefinitionSchema.parse({
+        name: "bad",
+        description: "bad",
+        namespaces: ["ok", 42],
+      })
+    ).toThrow();
+  });
+
+  it("rejects empty-string entries in namespaces", () => {
+    expect(() =>
+      mcpDefinitionSchema.parse({
+        name: "bad",
+        description: "bad",
+        namespaces: [""],
+      })
+    ).toThrow();
+  });
 });

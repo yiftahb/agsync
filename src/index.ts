@@ -70,9 +70,10 @@ program
   .description("Preview changes without writing files")
   .option("-d, --dir <path>", "Target directory", process.cwd())
   .option("--frozen", "Fail if lock file is missing or stale")
+  .option("--namespace <name>", "Only include MCP servers tagged with this namespace")
   .action(async (opts) => {
     try {
-      const plan = await runPlan(opts.dir, { frozen: opts.frozen });
+      const plan = await runPlan(opts.dir, { frozen: opts.frozen, namespace: opts.namespace });
       console.log(formatPlan(plan, opts.dir));
     } catch (err: unknown) {
       console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -85,9 +86,10 @@ program
   .description("Compile and generate client configs")
   .option("-d, --dir <path>", "Target directory", process.cwd())
   .option("--frozen", "Fail if lock file is missing or stale")
+  .option("--namespace <name>", "Only include MCP servers tagged with this namespace")
   .action(async (opts) => {
     try {
-      const { written, warnings } = await runSync(opts.dir, { frozen: opts.frozen });
+      const { written, warnings } = await runSync(opts.dir, { frozen: opts.frozen, namespace: opts.namespace });
       if (warnings.length > 0) {
         console.warn("Warnings:");
         for (const w of warnings) {
@@ -195,9 +197,10 @@ mcp
   .command("add <name>")
   .description("Create a new empty tool definition")
   .option("-d, --dir <path>", "Target directory", process.cwd())
-  .action(async (name: string, opts: { dir: string }) => {
+  .option("--namespace <name...>", "Tag this MCP with one or more namespaces")
+  .action(async (name: string, opts: { dir: string; namespace?: string[] }) => {
     try {
-      const file = await runAddTool(opts.dir, name);
+      const file = await runAddTool(opts.dir, name, opts.namespace);
       console.log(`Added tool:\n  + ${file}`);
     } catch (err: unknown) {
       console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
