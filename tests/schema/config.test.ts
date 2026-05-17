@@ -94,6 +94,8 @@ describe("agsyncConfigSchema", () => {
       skills: false,
       commands: false,
       mcp: false,
+      context: false,
+      review: false,
     });
     expect(result.gitignore).toBe("mcpOnly");
   });

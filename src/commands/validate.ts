@@ -137,6 +137,18 @@ async function validateLockStaleness(loaded: LoadedConfig): Promise<ValidationEr
   return warnings;
 }
 
+function validateReviewConfig(loaded: LoadedConfig): ValidationError[] {
+  const warnings: ValidationError[] = [];
+  if (loaded.config.features.review && !loaded.config.features.context) {
+    warnings.push({
+      file: "agsync.yaml",
+      message: "features.review is enabled but features.context is false — review output will have no guidelines",
+      severity: "warn",
+    });
+  }
+  return warnings;
+}
+
 export async function runValidate(targetDir: string): Promise<ValidationError[]> {
   const loaded = await loadHierarchicalConfig(targetDir);
 
@@ -152,6 +164,7 @@ export async function runValidate(targetDir: string): Promise<ValidationError[]>
   errors.push(...validateEnvReferences(loaded));
   errors.push(...validateExternalVersions(loaded));
   errors.push(...validateExtendsVersions(loaded));
+  errors.push(...validateReviewConfig(loaded));
   errors.push(...(await validateLockStaleness(loaded)));
 
   return errors;

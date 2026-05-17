@@ -81,7 +81,7 @@ describe("resolveAgentConfig", () => {
   it("applies global feature masking — skills globally off overrides per-agent enabled", () => {
     const resolved = resolveAgentConfig(
       { claude: { skills: { enabled: true }, mcp: { enabled: true } } },
-      { instructions: true, skills: false, commands: true, mcp: true }
+      { instructions: true, skills: false, commands: true, mcp: true, context: false, review: false }
     );
     expect(resolved.claude?.skills?.enabled).toBe(false);
     expect(resolved.claude?.mcp?.enabled).toBe(true);
@@ -90,7 +90,7 @@ describe("resolveAgentConfig", () => {
   it("respects all-false global features — nothing enabled", () => {
     const resolved = resolveAgentConfig(
       { claude: { instructions: { enabled: true }, skills: { enabled: true }, mcp: { enabled: true } } },
-      { instructions: false, skills: false, commands: false, mcp: false }
+      { instructions: false, skills: false, commands: false, mcp: false, context: false, review: false }
     );
     expect(resolved.claude?.instructions?.enabled).toBe(false);
     expect(resolved.claude?.skills?.enabled).toBe(false);

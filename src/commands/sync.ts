@@ -10,6 +10,8 @@ import { resolveAgentConfig } from "@/agents/registry";
 import { runValidate } from "@/commands/validate";
 import { expandMcpEnv, loadDotEnv } from "@/utils/env";
 import { readLockFile, writeLockFile } from "@/lock/lock";
+import { compileScopedAgentsMd } from "@/context/compiler";
+import { getCompiler } from "@/review/index";
 import type {
   ResolvedSkill, SyncPlan, PlannedFile, PlannedSkill,
   McpDefinition, AgentConfig, AgentMcpFeatureConfig, CommandDefinition,
@@ -379,10 +381,22 @@ export async function buildSyncPlan(
     .filter((s) => s.instructions.trim().length > 0 || s.skills.length > 0)
     .map((s) => s.scope);
 
-  const instructionsPath = resolve(baseDir, ".agsync", "instructions.md");
-  const userInstructions = await readFileOrEmpty(instructionsPath);
   const agentsMdPath = resolve(gitRoot, "AGENTS.md");
-  const agentsMdContent = buildAgentsMd(userInstructions, resolvedSkills, scopeRefs);
+  const patternDefs = loaded.patterns ?? [];
+  const useContext = loaded.config.features.context && !!loaded.compiledContexts;
+
+  let agentsMdContent: string;
+  if (useContext) {
+    const rootCtx = loaded.compiledContexts!.find((c) => c.scope === "");
+    agentsMdContent = rootCtx
+      ? compileScopedAgentsMd(rootCtx, resolvedSkills, patternDefs, { isRoot: true, scopeRefs })
+      : buildAgentsMd("", resolvedSkills, scopeRefs);
+  } else {
+    const instructionsPath = resolve(baseDir, ".agsync", "instructions.md");
+    const userInstructions = await readFileOrEmpty(instructionsPath);
+    agentsMdContent = buildAgentsMd(userInstructions, resolvedSkills, scopeRefs);
+  }
+
   const existingAgentsMd = await readFileOrEmpty(agentsMdPath);
   plannedFiles.push({
     path: agentsMdPath,
@@ -394,7 +408,15 @@ export async function buildSyncPlan(
   for (const scope of scopes) {
     if (!scope.instructions.trim() && scope.skills.length === 0) continue;
     const scopeAgentsMdPath = resolve(scope.dir, "AGENTS.md");
-    const scopeContent = buildScopedAgentsMd(scope, resolvedSkills);
+    let scopeContent: string;
+    if (useContext) {
+      const scopeCtx = loaded.compiledContexts!.find((c) => c.scope === scope.scope);
+      scopeContent = scopeCtx
+        ? compileScopedAgentsMd(scopeCtx, resolvedSkills, patternDefs)
+        : buildScopedAgentsMd(scope, resolvedSkills);
+    } else {
+      scopeContent = buildScopedAgentsMd(scope, resolvedSkills);
+    }
     const existingScopeAgentsMd = await readFileOrEmpty(scopeAgentsMdPath);
     plannedFiles.push({
       path: scopeAgentsMdPath,
@@ -402,6 +424,23 @@ export async function buildSyncPlan(
       existing: existingScopeAgentsMd,
       operation: !existingScopeAgentsMd ? "create" : scopeContent !== existingScopeAgentsMd ? "update" : "unchanged",
     });
+  }
+
+  if (loaded.config.features.review && loaded.config.review?.targets && useContext) {
+    for (const target of loaded.config.review.targets) {
+      const compiler = getCompiler(target);
+      if (!compiler) continue;
+      const content = compiler.compile(loaded.compiledContexts!);
+      if (!content) continue;
+      const outputPath = resolve(gitRoot, compiler.outputPath);
+      const existing = await readFileOrEmpty(outputPath);
+      plannedFiles.push({
+        path: outputPath,
+        content,
+        existing,
+        operation: !existing ? "create" : content !== existing ? "update" : "unchanged",
+      });
+    }
   }
 
   for (const [agentName, agentCfg] of Object.entries(agents)) {
@@ -415,6 +454,8 @@ export async function buildSyncPlan(
     );
   }
 
+  warnings.push(...(loaded.contextWarnings ?? []));
+
   return {
     skills: plannedSkills,
     files: plannedFiles,
@@ -422,6 +463,7 @@ export async function buildSyncPlan(
     canonicalSkillsDir: skillsDir,
     warnings,
     lockUpdates: resolveResult.lockUpdates,
+    compiledContexts: loaded.compiledContexts,
   };
 }
 

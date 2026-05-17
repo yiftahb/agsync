@@ -116,9 +116,57 @@ export interface GlobalFeatures {
   skills: boolean;
   commands: boolean;
   mcp: boolean;
+  context: boolean;
+  review: boolean;
 }
 
 export type GitignoreMode = "on" | "off" | "mcpOnly";
+
+export interface Guideline {
+  id: string;
+  rule: string;
+  paths?: string[];
+  override?: boolean;
+}
+
+export interface AppliedPattern {
+  id: string;
+  paths?: string[];
+}
+
+export interface StructuredInstructions {
+  extends?: string;
+  hld?: string;
+  guidelines: Guideline[];
+  applyPatterns: AppliedPattern[];
+}
+
+export interface PatternDefinition {
+  id: string;
+  hld?: string;
+  guidelines: Guideline[];
+}
+
+export interface ResolvedGuideline {
+  id: string;
+  rule: string;
+  paths: string[];
+  source: "root" | "package" | string;
+  overrideOf?: string;
+}
+
+export interface CompiledContext {
+  scope: string;
+  hld: string;
+  guidelines: ResolvedGuideline[];
+  patterns: string[];
+}
+
+export type ReviewTarget = "coderabbit";
+
+export interface ReviewConfig {
+  targets: ReviewTarget[];
+}
 
 export interface AgsyncConfig {
   version: string;
@@ -128,6 +176,7 @@ export interface AgsyncConfig {
   skills: { path: string }[];
   commands: { path: string }[];
   mcp: { path: string }[];
+  review?: ReviewConfig;
 }
 
 export interface ResolvedAgentConfig {
@@ -141,6 +190,7 @@ export interface ScopedContent {
   skills: SkillDefinition[];
   commands: CommandDefinition[];
   mcp: McpDefinition[];
+  structuredInstructions?: StructuredInstructions;
 }
 
 export interface LoadedConfig {
@@ -150,6 +200,9 @@ export interface LoadedConfig {
   mcp: McpDefinition[];
   configPath: string;
   scopes: ScopedContent[];
+  compiledContexts?: CompiledContext[];
+  contextWarnings?: string[];
+  patterns?: PatternDefinition[];
 }
 
 export interface ResolvedConfig {
@@ -206,6 +259,7 @@ export interface SyncPlan {
   canonicalSkillsDir: string;
   warnings: string[];
   lockUpdates?: LockUpdates;
+  compiledContexts?: CompiledContext[];
 }
 
 export interface DoctorCheck {

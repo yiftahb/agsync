@@ -69,7 +69,7 @@ describe("runDoctor", () => {
 
     jest.spyOn(configLoader, "loadConfigFile").mockResolvedValue({
       version: "1",
-      features: { instructions: true, skills: true, commands: true, mcp: true },
+      features: { instructions: true, skills: true, commands: true, mcp: true, context: false, review: false },
       gitignore: "mcpOnly",
       agents: { claude: { skills: { enabled: true }, mcp: { enabled: true } } },
       skills: [],
@@ -96,7 +96,7 @@ describe("runDoctor", () => {
 
     jest.spyOn(configLoader, "loadConfigFile").mockResolvedValue({
       version: "1",
-      features: { instructions: true, skills: true, commands: true, mcp: true },
+      features: { instructions: true, skills: true, commands: true, mcp: true, context: false, review: false },
       gitignore: "mcpOnly",
       agents: { codex: { skills: { enabled: false } } },
       skills: [],

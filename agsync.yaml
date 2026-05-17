@@ -8,6 +8,14 @@ features:
   skills: true
   commands: true
   mcp: true
+  # context: true   # structured context management (HLD, guidelines, patterns per package)
+  # review: true    # code review output — uses review.targets when enabled
+
+# ── Code review output ──────────────────────────────────────
+# Requires features.context: true
+# review:
+#   targets:
+#     - coderabbit   # generates .coderabbit.yaml at repo root
 
 # ── Content sources ──────────────────────────────────────────
 skills:

@@ -54,6 +54,10 @@ npx agsync-cli
 
 🔒 **Gitignore Management** — Automatically manage `.gitignore` entries for generated output. Choose between `on` (all output), `mcpOnly` (default, MCP configs only), or `off`.
 
+📐 **Structured Context** — Enable `features.context: true` to write `.agsync/instructions.md` with structured `## HLD`, `## Guidelines`, and `## Patterns` sections. Guidelines support path scoping (`paths: ["backend/**"]`), named IDs, and package-level overrides. Each subfolder compiles its own self-contained `AGENTS.md` from the hierarchy.
+
+🧾 **Code Review Output** — Enable `review: targets: [coderabbit]` to generate `.coderabbit.yaml` at the repo root on every `agsync sync`. Guidelines and their path scopes map directly to coderabbit `path_instructions` — one source of truth for agents and reviewers alike.
+
 ## Commands
 
 | Command | Description |

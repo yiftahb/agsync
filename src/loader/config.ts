@@ -8,6 +8,7 @@ import {
   mcpDefinitionSchema,
 } from "@/schema/config";
 import { parseSkillMd } from "@/utils/github";
+import { parseStructuredInstructions } from "@/context/parser";
 import type {
   AgsyncConfig,
   LoadedConfig,
@@ -150,7 +151,7 @@ export async function loadFullConfig(configPath: string): Promise<LoadedConfig> 
     (data) => mcpDefinitionSchema.parse(data)
   );
 
-  const scopes = await discoverScopes(baseDir);
+  const scopes = await discoverScopes(baseDir, config.features.context);
 
   return { config, skills, commands, mcp, configPath, scopes };
 }
@@ -197,7 +198,8 @@ export async function discoverAgsyncDirs(rootDir: string): Promise<string[]> {
 
 async function loadScopedContent(
   scopeDir: string,
-  rootDir: string
+  rootDir: string,
+  parseContext = false
 ): Promise<ScopedContent | null> {
   const agsyncDir = resolve(scopeDir, ".agsync");
   const relative = scopeDir === rootDir
@@ -239,21 +241,20 @@ async function loadScopedContent(
       )
     : [];
 
-  return {
-    scope: relative,
-    dir: scopeDir,
-    instructions,
-    skills,
-    commands,
-    mcp,
-  };
+  const result: ScopedContent = { scope: relative, dir: scopeDir, instructions, skills, commands, mcp };
+
+  if (parseContext && instructions) {
+    result.structuredInstructions = parseStructuredInstructions(instructions);
+  }
+
+  return result;
 }
 
-async function discoverScopes(rootDir: string): Promise<ScopedContent[]> {
+async function discoverScopes(rootDir: string, parseContext = false): Promise<ScopedContent[]> {
   const dirs = await discoverAgsyncDirs(rootDir);
   const scopes: ScopedContent[] = [];
   for (const dir of dirs.sort()) {
-    const scoped = await loadScopedContent(dir, rootDir);
+    const scoped = await loadScopedContent(dir, rootDir, parseContext);
     if (scoped) scopes.push(scoped);
   }
   return scopes;

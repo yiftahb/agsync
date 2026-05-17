@@ -61,6 +61,27 @@ export const pathRefSchema = z.object({
   path: z.string().min(1),
 });
 
+export const guidelineSchema = z.object({
+  id: z.string().min(1),
+  rule: z.string().min(1),
+  paths: z.array(z.string().min(1)).optional(),
+  override: z.boolean().optional(),
+});
+
+export const appliedPatternSchema = z.object({
+  id: z.string().min(1),
+  paths: z.array(z.string().min(1)).optional(),
+});
+
+export const patternFrontmatterSchema = z.object({
+  id: z.string().min(1),
+});
+
+export const instructionsFrontmatterSchema = z.object({
+  extends: z.string().optional(),
+  apply_patterns: z.array(appliedPatternSchema).default([]),
+});
+
 export const agentFeatureConfigSchema = z.object({
   enabled: z.boolean().default(false),
   destination: z.string().optional(),
@@ -79,6 +100,14 @@ export const globalFeaturesSchema = z.object({
   skills: z.boolean().default(false),
   commands: z.boolean().default(false),
   mcp: z.boolean().default(false),
+  context: z.boolean().default(false),
+  review: z.boolean().default(false),
+});
+
+export const reviewTargetSchema = z.enum(["coderabbit"]);
+
+export const reviewConfigSchema = z.object({
+  targets: z.array(reviewTargetSchema).default([]),
 });
 
 export const agsyncConfigSchema = z.object({
@@ -89,4 +118,5 @@ export const agsyncConfigSchema = z.object({
   skills: z.array(pathRefSchema).default([]),
   commands: z.array(pathRefSchema).default([]),
   mcp: z.array(pathRefSchema).default([]),
+  review: reviewConfigSchema.optional(),
 });
