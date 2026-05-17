@@ -112,6 +112,7 @@ export const reviewConfigSchema = z.object({
 
 export const agsyncConfigSchema = z.object({
   version: z.string().default("1"),
+  requiredVersion: z.string().optional(),
   features: globalFeaturesSchema.default({}),
   gitignore: z.enum(["on", "off", "mcpOnly"]).default("mcpOnly"),
   agents: z.record(agentConfigSchema).default({}),

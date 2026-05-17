@@ -170,6 +170,7 @@ export interface ReviewConfig {
 
 export interface AgsyncConfig {
   version: string;
+  requiredVersion?: string;
   features: GlobalFeatures;
   gitignore: GitignoreMode;
   agents: Record<string, Partial<UserAgentConfig>>;

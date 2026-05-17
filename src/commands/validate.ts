@@ -2,6 +2,7 @@ import { dirname } from "node:path";
 import { loadHierarchicalConfig } from "@/loader/hierarchy";
 import { findEnvReferences } from "@/utils/env";
 import { readLockFile } from "@/lock/lock";
+import { CURRENT_VERSION } from "@/utils/version";
 import type { ValidationError, LoadedConfig } from "@/types";
 
 function validateSkillCompleteness(loaded: LoadedConfig): ValidationError[] {
@@ -137,6 +138,20 @@ async function validateLockStaleness(loaded: LoadedConfig): Promise<ValidationEr
   return warnings;
 }
 
+function validateRequiredVersion(loaded: LoadedConfig): ValidationError[] {
+  const required = loaded.config.requiredVersion;
+  if (!required) return [];
+  if (CURRENT_VERSION !== required) {
+    return [
+      {
+        file: "agsync.yaml",
+        message: `This project requires agsync version ${required}`,
+      },
+    ];
+  }
+  return [];
+}
+
 function validateReviewConfig(loaded: LoadedConfig): ValidationError[] {
   const warnings: ValidationError[] = [];
   if (loaded.config.features.review && !loaded.config.features.context) {
@@ -157,6 +172,7 @@ export async function runValidate(targetDir: string): Promise<ValidationError[]>
   }
 
   const errors: ValidationError[] = [];
+  errors.push(...validateRequiredVersion(loaded));
   errors.push(...validateUniqueNames(loaded));
   errors.push(...validateSkillCompleteness(loaded));
   errors.push(...validateCrossReferences(loaded));
