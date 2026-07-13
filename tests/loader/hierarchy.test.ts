@@ -186,3 +186,83 @@ describe("loadHierarchicalConfig", () => {
     expect(result!.config.version).toBe("1");
   });
 });
+
+describe("buildScopeChain", () => {
+  it("builds the ordered ancestor chain, skipping prefixes with no instructions", async () => {
+    const { buildScopeChain } = await import("@/loader/hierarchy");
+    const empty = { guidelines: [], applyPatterns: [] };
+    const map = new Map([
+      ["", empty],
+      ["backend", empty],
+      ["backend/service-a", empty],
+    ]);
+    // "middle" prefix backend/service-a exists; missing intermediate is skipped
+    const chain = buildScopeChain("backend/service-a", map);
+    expect(chain.map((l) => l.scope)).toEqual(["", "backend", "backend/service-a"]);
+  });
+
+  it("skips an intermediate prefix that has no instructions", async () => {
+    const { buildScopeChain } = await import("@/loader/hierarchy");
+    const empty = { guidelines: [], applyPatterns: [] };
+    const map = new Map([
+      ["", empty],
+      ["backend/service-a", empty],
+    ]);
+    const chain = buildScopeChain("backend/service-a", map);
+    expect(chain.map((l) => l.scope)).toEqual(["", "backend/service-a"]);
+  });
+
+  it("returns just root for the root scope", async () => {
+    const { buildScopeChain } = await import("@/loader/hierarchy");
+    const empty = { guidelines: [], applyPatterns: [] };
+    const chain = buildScopeChain("", new Map([["", empty]]));
+    expect(chain.map((l) => l.scope)).toEqual([""]);
+  });
+});
+
+describe("loadHierarchicalConfig — nested context cascade", () => {
+  it("cascades root + nested scopes into a self-contained leaf context", async () => {
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        features: { context: true },
+        agents: {},
+        skills: [],
+        commands: [],
+        mcp: [],
+      })
+    );
+    await mkdir(join(tempDir, ".agsync"), { recursive: true });
+    await writeFile(
+      join(tempDir, ".agsync", "instructions.md"),
+      "## Guidelines\n\n- id: no-comments\n  rule: self-explanatory code\n"
+    );
+
+    const backend = join(tempDir, "backend", ".agsync");
+    await mkdir(backend, { recursive: true });
+    await writeFile(
+      join(backend, "instructions.md"),
+      "## Guidelines\n\n- id: structured-logging\n  rule: use the logger\n  paths: [\"src/**\"]\n"
+    );
+
+    const svc = join(tempDir, "backend", "service-a", ".agsync");
+    await mkdir(svc, { recursive: true });
+    await writeFile(
+      join(svc, "instructions.md"),
+      "## Guidelines\n\n- id: health-endpoint\n  rule: expose /health\n"
+    );
+
+    const result = await loadHierarchicalConfig(tempDir);
+    expect(result).not.toBeNull();
+
+    const leaf = result!.compiledContexts!.find((c) => c.scope === "backend/service-a")!;
+    expect(leaf).toBeDefined();
+    const ids = leaf.guidelines.map((g) => g.id).sort();
+    expect(ids).toEqual(["health-endpoint", "no-comments", "structured-logging"]);
+
+    expect(leaf.guidelines.find((g) => g.id === "no-comments")!.paths).toEqual(["**"]);
+    expect(leaf.guidelines.find((g) => g.id === "structured-logging")!.paths).toEqual(["backend/src/**"]);
+    expect(leaf.guidelines.find((g) => g.id === "health-endpoint")!.paths).toEqual(["backend/service-a/**"]);
+  });
+});

@@ -3,8 +3,8 @@ import { readFile } from "node:fs/promises";
 import { findNearestConfigFile, loadFullConfig } from "@/loader/config";
 import { parseStructuredInstructions } from "@/context/parser";
 import { loadPatterns } from "@/context/patterns";
-import { mergeContext } from "@/context/merger";
-import type { LoadedConfig } from "@/types";
+import { mergeContextChain, type ChainLevel } from "@/context/merger";
+import type { LoadedConfig, StructuredInstructions, CompiledContext } from "@/types";
 import { existsSync } from "node:fs";
 
 export function findGitRoot(startDir: string): string {
@@ -16,6 +16,25 @@ export function findGitRoot(startDir: string): string {
     current = dirname(current);
   }
   return startDir;
+}
+
+export function buildScopeChain(
+  targetScope: string,
+  levelByScope: Map<string, StructuredInstructions>
+): ChainLevel[] {
+  const chain: ChainLevel[] = [];
+  const root = levelByScope.get("");
+  if (root) chain.push({ scope: "", instructions: root });
+  if (targetScope === "") return chain;
+
+  const parts = targetScope.split(/[\\/]/);
+  let prefix = "";
+  for (const part of parts) {
+    prefix = prefix ? `${prefix}/${part}` : part;
+    const instructions = levelByScope.get(prefix);
+    if (instructions) chain.push({ scope: prefix, instructions });
+  }
+  return chain;
 }
 
 export async function loadHierarchicalConfig(startDir: string): Promise<LoadedConfig | null> {
@@ -58,15 +77,17 @@ export async function loadHierarchicalConfig(startDir: string): Promise<LoadedCo
     const { patterns, warnings: patternWarnings } = await loadPatterns(baseDir, loaded.scopes);
     contextWarnings.push(...patternWarnings);
 
-    const compiledContexts = [];
-
-    const { context: rootContext, warnings: rootWarnings } = mergeContext(null, rootStructured, "", patterns);
-    contextWarnings.push(...rootWarnings);
-    compiledContexts.push(rootContext);
-
+    const levelByScope = new Map<string, StructuredInstructions>();
+    levelByScope.set("", rootStructured);
     for (const scope of loaded.scopes) {
-      const pkgStructured = scope.structuredInstructions ?? { guidelines: [], applyPatterns: [] };
-      const { context, warnings } = mergeContext(rootStructured, pkgStructured, scope.scope, patterns);
+      levelByScope.set(scope.scope, scope.structuredInstructions ?? { guidelines: [], applyPatterns: [] });
+    }
+
+    const compiledContexts: CompiledContext[] = [];
+    const targetScopes = ["", ...loaded.scopes.map((s) => s.scope)];
+    for (const targetScope of targetScopes) {
+      const chain = buildScopeChain(targetScope, levelByScope);
+      const { context, warnings } = mergeContextChain(chain, patterns);
       contextWarnings.push(...warnings);
       compiledContexts.push(context);
     }
