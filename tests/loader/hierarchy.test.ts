@@ -266,3 +266,54 @@ describe("loadHierarchicalConfig — nested context cascade", () => {
     expect(leaf.guidelines.find((g) => g.id === "health-endpoint")!.paths).toEqual(["backend/service-a/**"]);
   });
 });
+
+describe("loadHierarchicalConfig — monorepo mixed adoption", () => {
+  it("applies a shared pattern scope-relative and ignores folders without .agsync", async () => {
+    await writeFile(
+      join(tempDir, "agsync.yaml"),
+      toYaml({
+        version: "1",
+        features: { context: true },
+        agents: {},
+        skills: [],
+        commands: [],
+        mcp: [],
+      })
+    );
+
+    await mkdir(join(tempDir, ".agsync", "patterns"), { recursive: true });
+    await writeFile(
+      join(tempDir, ".agsync", "instructions.md"),
+      "## Guidelines\n\n- id: no-comments\n  rule: self-explanatory code\n"
+    );
+    await writeFile(
+      join(tempDir, ".agsync", "patterns", "rest-api.md"),
+      "---\nid: rest-api\n---\n\n## Guidelines\n\n- id: thin-controllers\n  rule: no business logic in controllers\n  paths: [\"controllers/**\"]\n"
+    );
+
+    const svcA = join(tempDir, "backend", "service-a", ".agsync");
+    await mkdir(svcA, { recursive: true });
+    await writeFile(
+      join(svcA, "instructions.md"),
+      "---\napply_patterns:\n  - id: rest-api\n---\n\n## Guidelines\n\n- id: svc-rule\n  rule: expose /health\n"
+    );
+
+    // service-b has real code but no .agsync — must be ignored
+    await mkdir(join(tempDir, "backend", "service-b", "src"), { recursive: true });
+    await writeFile(join(tempDir, "backend", "service-b", "src", "index.ts"), "export const x = 1;\n");
+
+    const result = await loadHierarchicalConfig(tempDir);
+    expect(result).not.toBeNull();
+
+    const scopes = result!.compiledContexts!.map((c) => c.scope).sort();
+    expect(scopes).toEqual(["", "backend/service-a"]);
+
+    const leaf = result!.compiledContexts!.find((c) => c.scope === "backend/service-a")!;
+    expect(leaf.guidelines.find((g) => g.id === "no-comments")!.paths).toEqual(["**"]);
+    expect(leaf.guidelines.find((g) => g.id === "rest-api:thin-controllers")!.paths).toEqual([
+      "backend/service-a/controllers/**",
+    ]);
+    expect(leaf.guidelines.find((g) => g.id === "svc-rule")!.paths).toEqual(["backend/service-a/**"]);
+    expect(leaf.patterns).toEqual(["rest-api"]);
+  });
+});
