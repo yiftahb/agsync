@@ -1,0 +1,4 @@
+name: codebase-memory-mcp
+description: Codebase knowledge graph MCP — search_graph, trace_path, get_code_snippet, query_graph, get_architecture, search_code
+command: codebase-memory-mcp
+args: []

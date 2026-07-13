@@ -87,6 +87,7 @@ ESLint uses flat config (`eslint.config.mjs`) with typescript-eslint. Strict Typ
 
 - **agent-skills**: Expert in the Agent Skills open standard (agentskills.io). Use when creating, editing, or validating SKILL.md files, structuring skill directories, or understanding how skills are discovered and loaded by agents.
 - **agsync**: Expert in agsync, the Git-native CLI that syncs skills, commands, and MCP tools across AI coding agents. You MUST use this skill when working on agent skills, commands, MCP configurations or agsync (agsync.yaml) directly.
+- **context-manager**: Manages agsync structured context — create or edit instructions.md and pattern files, and migrate existing cursor rules or coderabbit YAML into the agsync context format. Use when the user asks to set up context, add guidelines, create patterns, or migrate from cursor/coderabbit configs.
 
 Skills are managed by agsync. Full definitions are in `.agents/skills/`.
 <!-- agsync:end -->

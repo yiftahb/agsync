@@ -51,20 +51,20 @@ agents:
       enabled: true
 
   # ── Claude Code ────────────────────────────────────────────
-  # claude:
-  #   instructions:
-  #     enabled: true
-  #     # destination: CLAUDE.md                   # default
-  #   skills:
-  #     enabled: true
-  #     # destination: .claude/skills              # default
-  #   commands:
-  #     enabled: true
-  #     # destination: .claude/commands            # default
-  #   mcp:
-  #     enabled: true
-  #     # destination: .mcp.json                    # default
-  #     # merge_strategy: merge                    # default
+  claude:
+    instructions:
+      enabled: true
+      # destination: CLAUDE.md                   # default
+    skills:
+      enabled: true
+      # destination: .claude/skills              # default
+    commands:
+      enabled: true
+      # destination: .claude/commands            # default
+    mcp:
+      enabled: true
+      # destination: .mcp.json                    # default
+      # merge_strategy: merge                    # default
 
   # ── Codex ──────────────────────────────────────────────────
   # codex:

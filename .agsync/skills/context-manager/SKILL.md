@@ -57,8 +57,8 @@ Why this pattern exists.
 
 <important>
 - Every guideline needs a unique `id` — use kebab-case, describe the constraint not the action
-- No duplicate rules across packages unless `override: true` is intentional
-- Paths in guidelines are relative to repo root — `backend/**` not `./backend/**`
+- Guidelines cascade root → nested scopes (`backend` → `backend/service-a`). A nested scope may redefine a parent guideline `id`; set `override: true` to silence the collision warning. Nearest scope wins.
+- Paths resolve relative to the scope that declares them: a guideline (or applied-pattern guideline) in `backend/service-a/.agsync` with `paths: ["controllers/**"]` resolves to `backend/service-a/controllers/**`. Use `**` for a rule that stays global at any scope. At the repo root, paths are repo-root-relative. `apply_patterns[].paths` is used verbatim (write the full path).
 - Run `agsync validate` before reporting done; fix any errors or warnings
 - Do not add guidelines that restate the obvious — only non-obvious constraints survive
 </important>
