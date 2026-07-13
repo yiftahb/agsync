@@ -2,14 +2,20 @@ node_modules/
 dist/
 *.tsbuildinfo
 coverage/
+docs/
 .cursor
 .cursor/mcp.json
 .mcp.json
+.DS_Store
 
 # agsync:begin
 .agents/
+.claude/commands
+.claude/skills
 .cursor/commands
 .cursor/mcp.json
 .cursor/skills
+.mcp.json
 AGENTS.md
+CLAUDE.md
 # agsync:end
