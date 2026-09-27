@@ -138,12 +138,6 @@ Rules:
 - A skill that references an MCP excluded by the active namespace produces a warning, not an error.
 - Scaffold a tagged MCP with `agsync mcp add <name> --namespace ci-cd` (repeat the flag to add multiple).
 
-## Security
-
-- `$VAR` / `${VAR}` expansion only applies to MCP definitions in your repository's `.agsync/mcp/`. Skills imported from GitHub or ClawHub can reference MCP servers by name but cannot define them, so they never trigger env expansion.
-- Files shipped by imported skills are written only inside that skill's `.agents/skills/<name>/` directory. A skill whose files or name would escape that directory fails the sync.
-- Generated MCP configs contain resolved values. Keep `gitignore: mcpOnly` (default) or `on` so they are never committed.
-
 ## License
 
 MIT
