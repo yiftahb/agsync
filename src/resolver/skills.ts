@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { resolve, relative, isAbsolute, sep } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { skillDefinitionSchema } from "@/schema/config";
 import { parseSkillMd } from "@/utils/github";
@@ -125,6 +125,14 @@ async function loadExtendedSkill(
   throw new Error(`Unknown skill reference format: ${ref}`);
 }
 
+function assertInsideSkillDir(skillName: string, filePath: string): void {
+  const base = resolve("skill");
+  const rel = relative(base, resolve(base, filePath));
+  if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+    throw new Error(`Skill "${skillName}" contains a file outside its directory: ${filePath}`);
+  }
+}
+
 async function resolveSourceSkill(
   skill: SkillDefinition,
   ctx: ResolveContext
@@ -146,6 +154,9 @@ async function resolveSourceSkill(
   }
 
   const fetched = await registry.fetch(skill.source);
+  for (const file of fetched.supportingFiles) {
+    assertInsideSkillDir(skill.name, file.path);
+  }
 
   const existingSource = ctx.lock?.sources[skill.name];
   if (existingSource && existingSource.resolved === fetched.resolvedVersion && existingSource.integrity === fetched.integrity) {

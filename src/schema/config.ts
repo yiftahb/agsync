@@ -31,8 +31,15 @@ export const skillSourceSchema = z.discriminatedUnion("registry", [
   clawhubSourceSchema,
 ]);
 
+const skillNameSchema = z
+  .string()
+  .min(1)
+  .refine((name) => !/[\\/]/.test(name) && name !== "." && name !== "..", {
+    message: "Skill name must not contain path separators or be '.' or '..'",
+  });
+
 export const skillDefinitionSchema = z.object({
-  name: z.string().min(1),
+  name: skillNameSchema,
   description: z.string().min(1),
   extends: z.array(z.string()).optional(),
   instructions: z.string().optional(),
@@ -41,7 +48,7 @@ export const skillDefinitionSchema = z.object({
 });
 
 export const skillMdFrontmatterSchema = z.object({
-  name: z.string().min(1),
+  name: skillNameSchema,
   description: z.string().min(1),
   extends: z.array(z.string()).optional(),
   tools: z.array(z.string()).optional(),
